@@ -1,6 +1,27 @@
-import type maplibregl from 'maplibre-gl';
+import maplibregl from 'maplibre-gl';
+import mlcontour from 'maplibre-contour';
 import type { Basemap } from '../basemap.ts';
 import { OSM_BRIGHT_LAYERS } from './osm-bright-style.ts';
+
+let demSourceInstance: InstanceType<typeof mlcontour.DemSource> | null =
+  typeof window !== 'undefined' ? (window as any).__rsrouterDemSource || null : null;
+
+export function getDemSource(): InstanceType<typeof mlcontour.DemSource> {
+  if (!demSourceInstance) {
+    demSourceInstance = new mlcontour.DemSource({
+      url: 'https://tiles.mapterhorn.com/{z}/{x}/{y}.webp',
+      encoding: 'terrarium',
+      maxzoom: 12,
+      worker: true,
+      cacheSize: 100,
+    });
+    demSourceInstance.setupMaplibre(maplibregl as any);
+    if (typeof window !== 'undefined') {
+      (window as any).__rsrouterDemSource = demSourceInstance;
+    }
+  }
+  return demSourceInstance;
+}
 
 export const FONT_BASE_URL = 'https://tiles.openfreemap.org/fonts/';
 export const FONT_NAMES = ['Noto Sans Regular', 'Noto Sans Bold', 'Noto Sans Italic'];
@@ -38,7 +59,7 @@ function getSpriteBaseUrl(): string {
 
 function buildCycleRouteHighlightLayers(): any[] {
   return [
-    // MTB route relations - light gold/amber (distinct from orange route slot)
+    // MTB route relations - gold-olive (distinct from orange route slot)
     {
       id: 'ocm-route-mtb',
       type: 'line',
@@ -53,39 +74,39 @@ function buildCycleRouteHighlightLayers(): any[] {
           ['linear'],
           ['zoom'],
           8,
-          '#f59e0b',
+          '#ca8a04',
           12,
-          '#fbbf24',
+          '#eab308',
           14,
-          '#fcd34d',
+          '#facc15',
           16,
-          '#fde68a',
+          '#fef08a',
         ],
         'line-width': [
           'interpolate',
           ['exponential', 1.45],
           ['zoom'],
           8,
-          0.65,
+          1.2,
           10,
-          1.3,
+          2.0,
           12,
-          3.4,
+          4.2,
           13,
-          5.6,
+          6.4,
           14,
-          9.0,
+          9.8,
           15,
-          13.5,
+          14.5,
           16,
-          19.0,
+          20.5,
           18,
-          29.0,
+          31.0,
         ],
         'line-opacity': 1,
       },
     },
-    // LCN (Local Cycle Network) - cool indigo-periwinkle purple (distinct from waterways and RCN lavender)
+    // LCN (Local Cycle Network) - teal (distinct from RCN purple and indigo cycleways)
     {
       id: 'ocm-route-lcn',
       type: 'line',
@@ -100,34 +121,34 @@ function buildCycleRouteHighlightLayers(): any[] {
           ['linear'],
           ['zoom'],
           8,
-          '#818cf8',
+          '#0d9488',
           12,
-          '#a5b4fc',
+          '#14b8a6',
           14,
-          '#b4c2fd',
+          '#5eead4',
           16,
-          '#c7d2fe',
+          '#99f6e4',
         ],
         'line-width': [
           'interpolate',
           ['exponential', 1.45],
           ['zoom'],
           8,
-          0.7,
+          1.3,
           10,
-          1.4,
+          2.2,
           12,
-          3.6,
+          4.4,
           13,
-          6.0,
+          6.8,
           14,
-          9.5,
+          10.4,
           15,
-          14.0,
+          15.0,
           16,
-          19.5,
+          21.0,
           18,
-          30.0,
+          32.0,
         ],
         'line-opacity': 1,
       },
@@ -141,25 +162,25 @@ function buildCycleRouteHighlightLayers(): any[] {
       filter: ['all', ['==', ['get', 'network'], 'lcn'], ['==', ['get', 'state'], 'proposed']],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': '#e0e7ff',
+        'line-color': '#ccfbf1',
         'line-width': [
           'interpolate',
           ['exponential', 1.45],
           ['zoom'],
           9,
-          0.8,
+          1.5,
           12,
-          3.3,
+          4.0,
           13,
-          5.5,
+          6.2,
           14,
-          8.8,
+          9.6,
           15,
-          13.0,
+          14.0,
           16,
-          18.0,
+          19.5,
           18,
-          28.0,
+          30.0,
         ],
         'line-opacity': 1,
       },
@@ -173,31 +194,31 @@ function buildCycleRouteHighlightLayers(): any[] {
       filter: ['all', ['==', ['get', 'network'], 'lcn'], ['==', ['get', 'state'], 'proposed']],
       layout: { 'line-cap': 'butt', 'line-join': 'round' },
       paint: {
-        'line-color': ['interpolate', ['linear'], ['zoom'], 9, '#818cf8', 12, '#a5b4fc', 14, '#b4c2fd', 16, '#c7d2fe'],
-        'line-dasharray': [2, 2],
+        'line-color': ['interpolate', ['linear'], ['zoom'], 9, '#0d9488', 12, '#14b8a6', 14, '#5eead4', 16, '#99f6e4'],
+        'line-dasharray': [5, 1.2],
         'line-width': [
           'interpolate',
           ['exponential', 1.45],
           ['zoom'],
           9,
-          0.8,
+          1.5,
           12,
-          3.3,
+          4.0,
           13,
-          5.5,
+          6.2,
           14,
-          8.8,
+          9.6,
           15,
-          13.0,
+          14.0,
           16,
-          18.0,
+          19.5,
           18,
-          28.0,
+          30.0,
         ],
         'line-opacity': 1,
       },
     },
-    // RCN (Regional Cycle Network) - light lavender purple (distinct from deep-purple route slot)
+    // RCN (Regional Cycle Network) - violet-purple
     {
       id: 'ocm-route-rcn',
       type: 'line',
@@ -212,11 +233,11 @@ function buildCycleRouteHighlightLayers(): any[] {
           ['linear'],
           ['zoom'],
           7,
-          '#c084fc',
+          '#a855f7',
           12,
-          '#d8b4fe',
+          '#c084fc',
           14,
-          '#ddb8ff',
+          '#d8b4fe',
           16,
           '#e9d5ff',
         ],
@@ -225,21 +246,23 @@ function buildCycleRouteHighlightLayers(): any[] {
           ['exponential', 1.45],
           ['zoom'],
           7,
-          0.65,
-          9,
           1.2,
+          9,
+          2.0,
+          11,
+          3.3,
           12,
-          3.8,
+          4.6,
           13,
-          6.3,
+          7.0,
           14,
-          10.0,
+          10.8,
           15,
-          14.5,
+          15.5,
           16,
-          20.5,
+          22.0,
           18,
-          31.0,
+          33.0,
         ],
         'line-opacity': 1,
       },
@@ -259,19 +282,21 @@ function buildCycleRouteHighlightLayers(): any[] {
           ['exponential', 1.45],
           ['zoom'],
           8,
-          0.7,
+          1.3,
+          10,
+          2.2,
           12,
-          3.5,
+          4.2,
           13,
-          5.8,
+          6.5,
           14,
-          9.2,
+          10.0,
           15,
-          13.5,
+          14.5,
           16,
-          19.0,
+          20.5,
           18,
-          29.0,
+          31.0,
         ],
         'line-opacity': 1,
       },
@@ -285,26 +310,28 @@ function buildCycleRouteHighlightLayers(): any[] {
       filter: ['all', ['==', ['get', 'network'], 'rcn'], ['==', ['get', 'state'], 'proposed']],
       layout: { 'line-cap': 'butt', 'line-join': 'round' },
       paint: {
-        'line-color': ['interpolate', ['linear'], ['zoom'], 8, '#c084fc', 12, '#d8b4fe', 14, '#ddb8ff', 16, '#e9d5ff'],
-        'line-dasharray': [2, 2],
+        'line-color': ['interpolate', ['linear'], ['zoom'], 8, '#a855f7', 12, '#c084fc', 14, '#d8b4fe', 16, '#e9d5ff'],
+        'line-dasharray': [5, 1.2],
         'line-width': [
           'interpolate',
           ['exponential', 1.45],
           ['zoom'],
           8,
-          0.7,
+          1.3,
+          10,
+          2.2,
           12,
-          3.5,
+          4.2,
           13,
-          5.8,
+          6.5,
           14,
-          9.2,
+          10.0,
           15,
-          13.5,
+          14.5,
           16,
-          19.0,
+          20.5,
           18,
-          29.0,
+          31.0,
         ],
         'line-opacity': 1,
       },
@@ -341,23 +368,25 @@ function buildCycleRouteHighlightLayers(): any[] {
           ['exponential', 1.45],
           ['zoom'],
           5,
-          0.5,
+          0.9,
           7,
-          0.8,
-          9,
           1.4,
+          9,
+          2.3,
+          11,
+          3.6,
           12,
-          4.0,
+          5.0,
           13,
-          6.6,
+          7.5,
           14,
-          10.5,
+          11.5,
           15,
-          15.5,
+          16.5,
           16,
-          21.5,
+          23.0,
           18,
-          32.0,
+          34.0,
         ],
         'line-opacity': 1,
       },
@@ -381,19 +410,21 @@ function buildCycleRouteHighlightLayers(): any[] {
           ['exponential', 1.45],
           ['zoom'],
           7,
-          0.65,
+          1.2,
+          9,
+          2.0,
           12,
-          3.6,
+          4.5,
           13,
-          6.0,
+          6.8,
           14,
-          9.6,
+          10.5,
           15,
-          14.0,
+          15.0,
           16,
-          19.5,
+          21.0,
           18,
-          30.0,
+          32.0,
         ],
         'line-opacity': 1,
       },
@@ -412,25 +443,27 @@ function buildCycleRouteHighlightLayers(): any[] {
       layout: { 'line-cap': 'butt', 'line-join': 'round' },
       paint: {
         'line-color': ['interpolate', ['linear'], ['zoom'], 7, '#f43f5e', 12, '#fb7185', 14, '#fda4af', 16, '#fecdd3'],
-        'line-dasharray': [2, 2],
+        'line-dasharray': [5, 1.2],
         'line-width': [
           'interpolate',
           ['exponential', 1.45],
           ['zoom'],
           7,
-          0.65,
+          1.2,
+          9,
+          2.0,
           12,
-          3.6,
+          4.5,
           13,
-          6.0,
+          6.8,
           14,
-          9.6,
+          10.5,
           15,
-          14.0,
+          15.0,
           16,
-          19.5,
+          21.0,
           18,
-          30.0,
+          32.0,
         ],
         'line-opacity': 1,
       },
@@ -440,7 +473,7 @@ function buildCycleRouteHighlightLayers(): any[] {
 
 function buildCycleInfraLayers(): any[] {
   return [
-    // Medium sky-blue backing under dashed cycle lanes so gaps between dashes are blue-tinted, not white
+    // Soft indigo backing under dashed cycle lanes so gaps between dashes are tinted, not white
     {
       id: 'ocm-rd5-cyclelane-bg',
       type: 'line',
@@ -450,7 +483,7 @@ function buildCycleInfraLayers(): any[] {
       filter: ['==', ['get', 'network'], 'cyclelane'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': '#93c5fd',
+        'line-color': '#a5b4fc',
         'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 11, 0.8, 13, 1.5, 15, 2.6, 18, 5.0],
         'line-opacity': 1,
       },
@@ -465,8 +498,8 @@ function buildCycleInfraLayers(): any[] {
       filter: ['==', ['get', 'network'], 'cyclelane'],
       layout: { 'line-cap': 'butt', 'line-join': 'round' },
       paint: {
-        'line-color': ['interpolate', ['linear'], ['zoom'], 11, '#0284c7', 15, '#0ea5e9'],
-        'line-dasharray': [2.5, 1.2],
+        'line-color': ['interpolate', ['linear'], ['zoom'], 11, '#4f46e5', 15, '#6366f1'],
+        'line-dasharray': [6, 0.9],
         'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 11, 0.6, 13, 1.3, 15, 2.4, 18, 4.8],
         'line-opacity': 1,
       },
@@ -481,7 +514,7 @@ function buildCycleInfraLayers(): any[] {
       filter: ['==', ['get', 'network'], 'cycleway'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': '#bae6fd',
+        'line-color': '#c7d2fe',
         'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 12, 1.8, 14, 3.2, 16, 5.2, 18, 8.0],
         'line-opacity': 1,
       },
@@ -495,7 +528,7 @@ function buildCycleInfraLayers(): any[] {
       filter: ['==', ['get', 'network'], 'cycleway'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': ['interpolate', ['linear'], ['zoom'], 10, '#0284c7', 15, '#38bdf8'],
+        'line-color': ['interpolate', ['linear'], ['zoom'], 10, '#4f46e5', 15, '#6366f1'],
         'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 10, 0.5, 12, 1.1, 14, 2.0, 16, 3.4, 18, 5.5],
         'line-opacity': 1,
       },
@@ -514,7 +547,7 @@ function buildCycleInfraLayers(): any[] {
       ],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': '#bae6fd',
+        'line-color': '#c7d2fe',
         'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 12, 1.8, 14, 3.2, 16, 5.2, 18, 8.0],
         'line-opacity': 1,
       },
@@ -524,7 +557,7 @@ function buildCycleInfraLayers(): any[] {
       type: 'line',
       source: 'openmaptiles',
       'source-layer': 'transportation',
-      minzoom: 11,
+      minzoom: 10,
       filter: [
         'all',
         ['==', ['get', 'class'], 'path'],
@@ -532,8 +565,8 @@ function buildCycleInfraLayers(): any[] {
       ],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': ['interpolate', ['linear'], ['zoom'], 11, '#0284c7', 15, '#38bdf8'],
-        'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 11, 0.7, 14, 2.0, 16, 3.4, 18, 5.5],
+        'line-color': ['interpolate', ['linear'], ['zoom'], 10, '#4f46e5', 15, '#6366f1'],
+        'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 10, 0.55, 12, 1.1, 14, 2.0, 16, 3.4, 18, 5.5],
         'line-opacity': 1,
       },
     },
@@ -543,7 +576,7 @@ function buildCycleInfraLayers(): any[] {
       type: 'line',
       source: 'openmaptiles',
       'source-layer': 'transportation',
-      minzoom: 12,
+      minzoom: 10,
       filter: [
         'any',
         ['==', ['get', 'subclass'], 'bridleway'],
@@ -552,7 +585,7 @@ function buildCycleInfraLayers(): any[] {
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
         'line-color': '#86efac',
-        'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 12, 1.0, 15, 2.0, 18, 4.0],
+        'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 10, 0.75, 12, 1.1, 15, 2.0, 18, 4.0],
         'line-opacity': 1,
       },
     },
@@ -562,7 +595,7 @@ function buildCycleInfraLayers(): any[] {
       type: 'line',
       source: 'openmaptiles',
       'source-layer': 'transportation',
-      minzoom: 12,
+      minzoom: 10,
       filter: [
         'any',
         ['==', ['get', 'subclass'], 'bridleway'],
@@ -570,9 +603,9 @@ function buildCycleInfraLayers(): any[] {
       ],
       layout: { 'line-cap': 'butt', 'line-join': 'round' },
       paint: {
-        'line-color': '#15803d',
-        'line-dasharray': [3, 1.5],
-        'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 12, 0.8, 15, 1.8, 18, 3.8],
+        'line-color': '#16a34a',
+        'line-dasharray': [5.5, 0.9],
+        'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 10, 0.6, 12, 0.9, 15, 1.8, 18, 3.8],
         'line-opacity': 1,
       },
     },
@@ -582,8 +615,8 @@ function buildCycleInfraLayers(): any[] {
 const CYCLE_SHIELD_COLORS: Record<string, string> = {
   'cycle-shield-ncn': '#e11d48',
   'cycle-shield-rcn': '#9333ea',
-  'cycle-shield-lcn': '#6366f1',
-  'cycle-shield-mtb': '#d97706',
+  'cycle-shield-lcn': '#0d9488',
+  'cycle-shield-mtb': '#ca8a04',
 };
 
 function createShieldImageData(hexColor: string): {
@@ -708,16 +741,613 @@ function buildCycleRouteLabelLayers(): any[] {
   ];
 }
 
-export function getOfflineStyle(_basemap: Basemap = 'standard'): maplibregl.StyleSpecification {
-  return getOpenCycleMapVectorStyle();
+export function getOfflineStyle(basemap: Basemap = 'dense'): maplibregl.StyleSpecification {
+  if (basemap === 'dense') {
+    return getDenseVectorStyle(true);
+  }
+  return getOpenCycleMapVectorStyle(true);
 }
 
-export function getOpenCycleMapVectorStyle(): maplibregl.StyleSpecification {
+export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecification {
+  const style = getOpenCycleMapVectorStyle(false);
+  const layers = style.layers as any[];
+
+  // 1. Boost woodland & park landcover richness, separate tracks from paved minor roads, and show trails/labels earlier
+  for (const layer of layers) {
+    if (layer.id === 'landcover-wood' && layer.paint) {
+      layer.paint['fill-color'] = 'hsla(104, 46%, 64%, 0.48)';
+      layer.paint['fill-opacity'] = 0.65;
+    } else if (layer.id === 'park' && layer.paint) {
+      layer.paint['fill-color'] = '#d5ebd0';
+      layer.paint['fill-opacity'] = 0.6;
+    } else if (
+      layer.id === 'highway-minor-casing' ||
+      layer.id === 'highway-minor' ||
+      layer.id === 'bridge-minor-casing' ||
+      layer.id === 'bridge-minor'
+    ) {
+      // Exclude unpaved farm/forest tracks ('track') from solid white paved road rendering
+      layer.filter = [
+        'all',
+        ['match', ['geometry-type'], ['LineString', 'MultiLineString'], true, false],
+        layer.id.startsWith('bridge-')
+          ? ['==', ['get', 'brunnel'], 'bridge']
+          : ['!=', ['get', 'brunnel'], 'tunnel'],
+        ['match', ['get', 'class'], ['minor', 'service'], true, false],
+      ];
+    } else if (layer.id === 'highway-path' && layer.paint) {
+      layer.minzoom = 10.5;
+      layer.paint['line-color'] = '#64748b';
+      layer.paint['line-dasharray'] = [4.5, 0.8];
+      layer.paint['line-width'] = [
+        'interpolate',
+        ['exponential', 1.25],
+        ['zoom'],
+        10.5,
+        0.65,
+        12.5,
+        0.9,
+        15,
+        1.35,
+        18,
+        2.6,
+      ];
+    } else if (layer.id === 'highway-name-major') {
+      layer.minzoom = 10.5;
+    } else if (layer.id === 'highway-name-minor') {
+      layer.minzoom = 13;
+    } else if (layer.id === 'highway-name-path') {
+      layer.minzoom = 13.5;
+    } else if (layer.id === 'poi_r1') {
+      layer.minzoom = 15;
+    } else if (layer.id === 'poi_r7') {
+      layer.minzoom = 16;
+    } else if (layer.id === 'poi_r20') {
+      layer.minzoom = 17;
+    } else if (layer.id === 'label_village') {
+      layer.minzoom = 8;
+    } else if (layer.id === 'label_other') {
+      layer.minzoom = 7.5;
+    }
+  }
+
+  // 1b. Insert natural terrain landcover layers (farmland, heath/moorland, scrub, wetland, rock/scree)
+  const grassIdx = layers.findIndex((l) => l.id === 'landcover-grass');
+  const terrainLandcoverLayers: any[] = [
+    {
+      id: 'dense-landcover-farmland',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'landcover',
+      minzoom: 8,
+      filter: ['==', ['get', 'class'], 'farmland'],
+      paint: {
+        'fill-color': '#f2efe2',
+        'fill-opacity': 0.55,
+      },
+    },
+    {
+      id: 'dense-landcover-heath-moor',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'landcover',
+      minzoom: 7,
+      filter: [
+        'all',
+        ['==', ['get', 'class'], 'grass'],
+        ['match', ['get', 'subclass'], ['heath', 'moor', 'fell', 'tundra'], true, false],
+      ],
+      paint: {
+        'fill-color': '#e3dbc3',
+        'fill-opacity': 0.78,
+      },
+    },
+    {
+      id: 'dense-landcover-scrub',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'landcover',
+      minzoom: 8,
+      filter: ['all', ['==', ['get', 'class'], 'grass'], ['==', ['get', 'subclass'], 'scrub']],
+      paint: {
+        'fill-color': '#cde0b8',
+        'fill-opacity': 0.72,
+      },
+    },
+    {
+      id: 'dense-landcover-wetland',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'landcover',
+      minzoom: 7,
+      filter: ['==', ['get', 'class'], 'wetland'],
+      paint: {
+        'fill-color': 'hsla(168, 42%, 75%, 0.45)',
+      },
+    },
+    {
+      id: 'dense-landcover-wetland-pattern',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'landcover',
+      minzoom: 10,
+      filter: ['==', ['get', 'class'], 'wetland'],
+      paint: {
+        'fill-pattern': 'wetland_11',
+        'fill-opacity': 0.5,
+      },
+    },
+    {
+      id: 'dense-landcover-rock',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'landcover',
+      minzoom: 8,
+      filter: ['==', ['get', 'class'], 'rock'],
+      paint: {
+        'fill-color': '#d6d3d1',
+        'fill-opacity': 0.7,
+      },
+    },
+  ];
+  if (grassIdx >= 0) {
+    layers.splice(grassIdx + 1, 0, ...terrainLandcoverLayers);
+  } else {
+    layers.unshift(...terrainLandcoverLayers);
+  }
+
+  // 2. Add hillshade and 10m/50m contour lines below water & roads when online
+  const waterIdx = layers.findIndex((l) => l.id === 'waterway_tunnel');
+  const terrainInsertIdx = waterIdx >= 0 ? waterIdx : 14;
+
+  if (!offline) {
+    const demSource = getDemSource();
+    style.sources.dem = {
+      type: 'raster-dem',
+      encoding: 'terrarium',
+      tiles: [demSource.sharedDemProtocolUrl],
+      tileSize: 512,
+      maxzoom: 12,
+      attribution:
+        '© <a href="https://mapterhorn.com/attribution" target="_blank" rel="noopener">Mapterhorn</a>',
+    };
+    style.sources.contours = {
+      type: 'vector',
+      tiles: [
+        demSource.contourProtocolUrl({
+          overzoom: 1,
+          thresholds: {
+            11: [20, 100],
+            12: [10, 50],
+            14: [10, 50],
+          },
+          elevationKey: 'ele',
+          levelKey: 'level',
+          contourLayer: 'contours',
+        }),
+      ],
+      minzoom: 11,
+      maxzoom: 15,
+    };
+
+    layers.splice(
+      terrainInsertIdx,
+      0,
+      {
+        id: 'dense-hillshade',
+        type: 'hillshade',
+        source: 'dem',
+        paint: {
+          'hillshade-exaggeration': 0.26,
+          'hillshade-shadow-color': '#475569',
+          'hillshade-highlight-color': '#ffffff',
+          'hillshade-accent-color': '#64748b',
+        },
+      },
+      {
+        id: 'dense-contour-line',
+        type: 'line',
+        source: 'contours',
+        'source-layer': 'contours',
+        minzoom: 11,
+        paint: {
+          'line-color': '#b88c65',
+          'line-opacity': ['match', ['get', 'level'], 1, 0.42, 0.22],
+          'line-width': ['match', ['get', 'level'], 1, 1.05, 0.55],
+        },
+      },
+    );
+  }
+
+  // 3. Add National Park / Nature Reserve dashed olive boundary & unpaved road texture
+  const boundaryIdx = layers.findIndex((l) => l.id === 'boundary_3');
+  const parkOutlineLayer = {
+    id: 'dense-park-outline',
+    type: 'line',
+    source: 'openmaptiles',
+    'source-layer': 'park',
+    minzoom: 8,
+    paint: {
+      'line-color': '#4d7c0f',
+      'line-opacity': 0.45,
+      'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1.0, 13, 1.8],
+      'line-dasharray': [3, 2],
+    },
+  };
+  if (boundaryIdx >= 0) {
+    layers.splice(boundaryIdx, 0, parkOutlineLayer);
+  } else {
+    layers.push(parkOutlineLayer);
+  }
+
+  // Farm/forest tracks, unpaved surface indicator, steps, fords, and oneway arrows
+  const labelStartIdx = layers.findIndex((l) => l.id === 'waterway_line_label');
+  const roadDetailLayers: any[] = [
+    {
+      id: 'dense-track-casing',
+      type: 'line',
+      source: 'openmaptiles',
+      'source-layer': 'transportation',
+      minzoom: 10.5,
+      filter: [
+        'all',
+        ['match', ['geometry-type'], ['LineString', 'MultiLineString'], true, false],
+        ['==', ['get', 'class'], 'track'],
+      ],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': '#f5f0e6',
+        'line-opacity': 0.75,
+        'line-width': ['interpolate', ['exponential', 1.3], ['zoom'], 10.5, 1.0, 12, 1.4, 15, 2.8, 18, 5.5],
+      },
+    },
+    {
+      id: 'dense-track',
+      type: 'line',
+      source: 'openmaptiles',
+      'source-layer': 'transportation',
+      minzoom: 10.5,
+      filter: [
+        'all',
+        ['match', ['geometry-type'], ['LineString', 'MultiLineString'], true, false],
+        ['==', ['get', 'class'], 'track'],
+      ],
+      layout: { 'line-cap': 'butt', 'line-join': 'round' },
+      paint: {
+        'line-color': '#92400e',
+        'line-opacity': 0.85,
+        'line-dasharray': [5.5, 0.9],
+        'line-width': ['interpolate', ['exponential', 1.3], ['zoom'], 10.5, 0.65, 12, 0.95, 15, 1.8, 18, 3.6],
+      },
+    },
+    {
+      id: 'dense-unpaved-overlay',
+      type: 'line',
+      source: 'openmaptiles',
+      'source-layer': 'transportation',
+      minzoom: 13,
+      filter: [
+        'all',
+        ['==', ['get', 'surface'], 'unpaved'],
+        ['match', ['get', 'class'], ['minor', 'service', 'tertiary'], true, false],
+      ],
+      layout: { 'line-cap': 'butt', 'line-join': 'round' },
+      paint: {
+        'line-color': '#92400e',
+        'line-opacity': 0.4,
+        'line-dasharray': [1.5, 1.5],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 13, 1.1, 16, 2.2],
+      },
+    },
+    {
+      id: 'dense-steps',
+      type: 'line',
+      source: 'openmaptiles',
+      'source-layer': 'transportation',
+      minzoom: 14,
+      filter: ['==', ['get', 'subclass'], 'steps'],
+      layout: { 'line-cap': 'butt', 'line-join': 'round' },
+      paint: {
+        'line-color': '#dc2626',
+        'line-dasharray': [0.5, 0.7],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 14, 2.2, 17, 4.2],
+      },
+    },
+    {
+      id: 'dense-ford',
+      type: 'line',
+      source: 'openmaptiles',
+      'source-layer': 'transportation',
+      minzoom: 13,
+      filter: ['==', ['get', 'brunnel'], 'ford'],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': '#0284c7',
+        'line-dasharray': [1.2, 1.2],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 13, 2.0, 16, 3.8],
+      },
+    },
+    {
+      id: 'dense-oneway-arrows',
+      type: 'symbol',
+      source: 'openmaptiles',
+      'source-layer': 'transportation',
+      minzoom: 15,
+      filter: ['==', ['get', 'oneway'], 1],
+      layout: {
+        'symbol-placement': 'line',
+        'symbol-spacing': 150,
+        'icon-image': 'oneway',
+        'icon-size': 0.75,
+        'icon-rotation-alignment': 'map',
+        'icon-padding': 2,
+      },
+      paint: {
+        'icon-opacity': 0.65,
+      },
+    },
+  ];
+  if (labelStartIdx >= 0) {
+    layers.splice(labelStartIdx, 0, ...roadDetailLayers);
+  } else {
+    layers.push(...roadDetailLayers);
+  }
+
+  // 4. Add contour elevation labels, house numbers, park labels, cycling POIs, and mountain peaks
+  const poiIdx = layers.findIndex((l) => l.id === 'poi_r20');
+  const denseSymbolLayers: any[] = [];
+
+  if (!offline) {
+    denseSymbolLayers.push({
+      id: 'dense-contour-label',
+      type: 'symbol',
+      source: 'contours',
+      'source-layer': 'contours',
+      minzoom: 12,
+      filter: ['>', ['get', 'level'], 0],
+      layout: {
+        'symbol-placement': 'line',
+        'symbol-spacing': 320,
+        'text-field': ['concat', ['to-string', ['get', 'ele']], 'm'],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': 9.5,
+        'text-padding': 4,
+      },
+      paint: {
+        'text-color': '#855834',
+        'text-halo-color': 'rgba(248, 244, 240, 0.88)',
+        'text-halo-width': 1.2,
+      },
+    });
+  }
+
+  denseSymbolLayers.push(
+    {
+      id: 'dense-housenumber',
+      type: 'symbol',
+      source: 'openmaptiles',
+      'source-layer': 'housenumber',
+      minzoom: 16,
+      layout: {
+        'text-field': ['get', 'housenumber'],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': 9,
+        'text-padding': 1,
+      },
+      paint: {
+        'text-color': '#78716c',
+        'text-halo-color': 'rgba(248, 244, 240, 0.85)',
+        'text-halo-width': 1,
+      },
+    },
+    {
+      id: 'dense-park-label',
+      type: 'symbol',
+      source: 'openmaptiles',
+      'source-layer': 'park',
+      minzoom: 9,
+      filter: ['has', 'name'],
+      layout: {
+        'text-field': ['coalesce', ['get', 'name_en'], ['get', 'name']],
+        'text-font': ['Noto Sans Italic'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 9, 10, 13, 12],
+        'text-max-width': 8,
+      },
+      paint: {
+        'text-color': '#166534',
+        'text-halo-color': 'rgba(255, 255, 255, 0.85)',
+        'text-halo-width': 1.2,
+      },
+    },
+    {
+      id: 'dense-poi-cycling',
+      type: 'symbol',
+      source: 'openmaptiles',
+      'source-layer': 'poi',
+      minzoom: 14.5,
+      filter: [
+        'all',
+        ['match', ['geometry-type'], ['MultiPoint', 'Point'], true, false],
+        [
+          'match',
+          ['get', 'class'],
+          [
+            'cafe',
+            'beer',
+            'bar',
+            'bakery',
+            'fast_food',
+            'ice_cream',
+            'drinking_water',
+            'toilets',
+            'bicycle',
+            'bicycle_rental',
+            'shelter',
+            'campsite',
+            'picnic_site',
+            'castle',
+            'monument',
+            'attraction',
+            'fuel',
+            'grocery',
+            'pharmacy',
+            'hospital',
+            'ferry',
+          ],
+          true,
+          false,
+        ],
+      ],
+      layout: {
+        'icon-image': ['get', 'class'],
+        'icon-size': 0.85,
+        'text-anchor': 'top',
+        'text-field': [
+          'step',
+          ['zoom'],
+          '',
+          15.5,
+          ['coalesce', ['get', 'name_en'], ['get', 'name']],
+        ],
+        'text-font': ['Noto Sans Italic'],
+        'text-max-width': 8,
+        'text-offset': [0, 0.65],
+        'text-size': 11,
+        'text-optional': true,
+      },
+      paint: {
+        'text-color': '#475569',
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 1.1,
+      },
+    },
+    {
+      id: 'dense-mountain-peak',
+      type: 'symbol',
+      source: 'openmaptiles',
+      'source-layer': 'mountain_peak',
+      minzoom: 9,
+      filter: ['has', 'name'],
+      layout: {
+        'icon-image': 'mountain_11',
+        'icon-size': 0.9,
+        'text-anchor': 'top',
+        'text-field': [
+          'case',
+          ['has', 'ele'],
+          [
+            'concat',
+            ['coalesce', ['get', 'name_en'], ['get', 'name']],
+            '\n',
+            ['to-string', ['round', ['get', 'ele']]],
+            ' m',
+          ],
+          ['coalesce', ['get', 'name_en'], ['get', 'name']],
+        ],
+        'text-font': ['Noto Sans Italic'],
+        'text-max-width': 8,
+        'text-offset': [0, 0.55],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 9, 10, 13, 11.5],
+      },
+      paint: {
+        'text-color': '#7c2d12',
+        'text-halo-color': 'rgba(255, 255, 255, 0.9)',
+        'text-halo-width': 1.2,
+      },
+    },
+  );
+
+  if (poiIdx >= 0) {
+    layers.splice(poiIdx, 0, ...denseSymbolLayers);
+  } else {
+    layers.push(...denseSymbolLayers);
+  }
+
+  return style;
+}
+
+export function getOpenCycleMapVectorStyle(isLight = true): maplibregl.StyleSpecification {
   const baseLayers = structuredClone(OSM_BRIGHT_LAYERS);
+
+  // Remove bus stops and car parking POIs from base layers, and show trails/paths when zoomed out
+  for (const layer of baseLayers) {
+    if (layer.id === 'poi_transit') {
+      layer.filter = ['match', ['get', 'class'], ['airport', 'rail', 'ferry'], true, false];
+    } else if (
+      (layer.id === 'poi_r1' || layer.id === 'poi_r7' || layer.id === 'poi_r20') &&
+      Array.isArray(layer.filter)
+    ) {
+      layer.filter = [
+        ...layer.filter,
+        ['!', ['match', ['get', 'class'], ['bus', 'parking', 'parking_garage'], true, false]],
+      ];
+      if (layer.id === 'poi_r1') layer.minzoom = 15;
+      if (layer.id === 'poi_r7') layer.minzoom = 16;
+      if (layer.id === 'poi_r20') layer.minzoom = 17;
+    } else if (layer.id === 'highway-path' && layer.paint) {
+      layer.minzoom = 10.5;
+      layer.paint['line-color'] = isLight ? '#94a3b8' : '#64748b';
+      layer.paint['line-opacity'] = isLight ? 0.55 : 0.9;
+      layer.paint['line-dasharray'] = [4.5, 0.8];
+      layer.paint['line-width'] = [
+        'interpolate',
+        ['exponential', 1.2],
+        ['zoom'],
+        10.5,
+        0.65,
+        13,
+        0.95,
+        15,
+        1.2,
+        20,
+        4,
+      ];
+    }
+
+    if (isLight && layer.paint) {
+      if (layer.id === 'background') {
+        layer.paint['background-color'] = '#fbfaf8';
+      } else if (layer.id === 'landcover-wood') {
+        layer.paint['fill-opacity'] = 0.22;
+      } else if (layer.id === 'landcover-grass' || layer.id === 'park') {
+        layer.paint['fill-opacity'] = 0.28;
+      } else if (layer.id.startsWith('landuse-')) {
+        layer.paint['fill-opacity'] = 0.35;
+      } else if (layer.id === 'water') {
+        layer.paint['fill-color'] = '#bad8f7';
+      } else if (layer.id.startsWith('waterway-')) {
+        layer.paint['line-color'] = '#bad8f7';
+      } else if (layer.id === 'building') {
+        layer.paint['fill-opacity'] = 0.45;
+      } else if (
+        layer.id === 'highway-minor-casing' ||
+        layer.id === 'highway-secondary-tertiary-casing'
+      ) {
+        layer.paint['line-color'] = '#dfddd9';
+      } else if (
+        layer.id === 'highway-primary-casing' ||
+        layer.id === 'highway-trunk-casing' ||
+        layer.id === 'highway-motorway-casing'
+      ) {
+        layer.paint['line-color'] = '#f0c496';
+      } else if (
+        layer.id === 'highway-secondary-tertiary' ||
+        layer.id === 'highway-primary' ||
+        layer.id === 'highway-trunk'
+      ) {
+        layer.paint['line-color'] = '#fff9e0';
+      }
+    }
+  }
 
   // Insert route highlight bands underneath road fills (before highway-path) so roads & routes sit cleanly inside the halo
   const roadFillIdx = baseLayers.findIndex((l) => l.id === 'highway-path');
   const routeLayers = buildCycleRouteHighlightLayers();
+  if (isLight) {
+    for (const layer of routeLayers) {
+      if (layer.paint) layer.paint['line-opacity'] = 0.55;
+    }
+  }
   if (roadFillIdx >= 0) {
     baseLayers.splice(roadFillIdx, 0, ...routeLayers);
   } else {
@@ -727,6 +1357,11 @@ export function getOpenCycleMapVectorStyle(): maplibregl.StyleSpecification {
   // Insert physical cycling infrastructure (cycleways, lanes, bridleways) above road fills but below labels
   const labelIdx = baseLayers.findIndex((l) => l.id === 'waterway_line_label');
   const infraLayers = buildCycleInfraLayers();
+  if (isLight) {
+    for (const layer of infraLayers) {
+      if (layer.paint) layer.paint['line-opacity'] = 0.58;
+    }
+  }
   if (labelIdx >= 0) {
     baseLayers.splice(labelIdx, 0, ...infraLayers);
   } else {
@@ -736,6 +1371,14 @@ export function getOpenCycleMapVectorStyle(): maplibregl.StyleSpecification {
   // Insert cycle route ref labels alongside road labels
   const roadLabelIdx = baseLayers.findIndex((l) => l.id === 'highway-name-major');
   const routeLabelLayers = buildCycleRouteLabelLayers();
+  if (isLight) {
+    for (const layer of routeLabelLayers) {
+      if (layer.paint) {
+        layer.paint['icon-opacity'] = 0.8;
+        layer.paint['text-opacity'] = 0.85;
+      }
+    }
+  }
   if (roadLabelIdx >= 0) {
     baseLayers.splice(roadLabelIdx + 1, 0, ...routeLabelLayers);
   } else {
@@ -826,6 +1469,9 @@ export function getOpenCycleMapStyle(apiKey?: string): maplibregl.StyleSpecifica
 }
 
 export function getOnlineStyle(basemap: Basemap, thunderforestKey?: string): string | maplibregl.StyleSpecification {
+  if (basemap === 'dense') {
+    return getDenseVectorStyle(false);
+  }
   if (basemap === 'cyclosm') {
     return CYCLOSM_STYLE;
   }

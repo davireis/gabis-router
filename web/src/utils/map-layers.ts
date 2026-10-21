@@ -96,6 +96,8 @@ export function syncRoutesLayers(map: maplibregl.Map, slots: RouteSlotState[]) {
     const source = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
     if (source) {
       source.setData(data);
+      if (map.getLayer(casingId)) map.setPaintProperty(casingId, 'line-color', color.casing);
+      if (map.getLayer(lineId)) map.setPaintProperty(lineId, 'line-color', color.line);
     } else {
       map.addSource(sourceId, { type: 'geojson', data });
       map.addLayer({

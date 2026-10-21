@@ -102,8 +102,13 @@ export class TilePickerControl implements maplibregl.IControl {
     const current = getBasemap();
     const options: { id: Basemap; label: string; desc?: string; infoUrl?: string }[] = [
       {
+        id: 'dense',
+        label: 'GBRouter Dense',
+        desc: 'Contours, hillshade, peaks & POIs',
+      },
+      {
         id: 'standard',
-        label: 'GBRouter / OSM Bright',
+        label: 'GBRouter Light',
         desc: 'Light tiles with cycle routes',
       },
       {
@@ -123,7 +128,7 @@ export class TilePickerControl implements maplibregl.IControl {
       ${options
         .map((opt) => {
           const isActive = current === opt.id;
-          const isDisabled = this.isOffline && opt.id !== 'standard';
+          const isDisabled = this.isOffline && opt.id !== 'standard' && opt.id !== 'dense';
           const infoLink = opt.infoUrl
             ? ` <a href="${opt.infoUrl}" target="_blank" rel="noopener noreferrer" class="info-btn tile-opt-info-link" title="${opt.infoUrl}" aria-label="More info">i</a>`
             : '';

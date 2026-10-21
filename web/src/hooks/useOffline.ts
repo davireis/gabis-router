@@ -126,14 +126,18 @@ function formatMb(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1);
 }
 
-// Global PMTiles in-memory map and initialization gate
-export const loadedPMTiles = new Map<string, pmtiles.PMTiles>();
+// Global PMTiles in-memory map and initialization gate (persisted across HMR)
+export const loadedPMTiles: Map<string, pmtiles.PMTiles> =
+  (window as any).loadedPMTiles || new Map<string, pmtiles.PMTiles>();
 (window as any).loadedPMTiles = loadedPMTiles;
 
-let resolveArchivesReady: () => void;
-export const archivesReady = new Promise<void>((resolve) => {
+let resolveArchivesReady: () => void = () => {};
+export const archivesReady: Promise<void> = new Promise<void>((resolve) => {
   resolveArchivesReady = resolve;
 });
+if (typeof window !== 'undefined' && (window as any).map) {
+  resolveArchivesReady();
+}
 
 export function useOffline(
   onClearWorkerGraph: (recompute?: boolean) => void,

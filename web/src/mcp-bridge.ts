@@ -193,7 +193,7 @@ function pumpMapFrames(map: maplibregl.Map, durationMs = 400): Promise<void> {
   if ((map as any).style && !(map as any).style._loaded && activeCtxRef.current) {
     const cur = activeCtxRef.current;
     const style = cur.offline.isOfflineMode
-      ? getOfflineStyle()
+      ? getOfflineStyle(cur.settings.basemap)
       : getOnlineStyle(cur.settings.basemap, cur.settings.thunderforestKey);
     try {
       (map as any).style._frameRequest?.abort?.();

@@ -14,6 +14,7 @@ import {
 import type { Basemap } from '../basemap.ts';
 import type { SegmentHighlight } from '../utils/classification.ts';
 import {
+  getDemSource,
   getOfflineStyle,
   getOnlineStyle,
   registerCycleShieldImages,
@@ -22,6 +23,7 @@ import {
 } from '../utils/map-styles.ts';
 import { tilePickerControl } from '../tile-picker.ts';
 import { centerRouteControl } from '../center-control.ts';
+import { legendControl } from '../legend-control.ts';
 import { loadedPMTiles, archivesReady } from '../hooks/useOffline.ts';
 import { CYCLE_ROUTES_ARCHIVE, MAP_TILES_CACHE_NAME, segmentsForTile } from '../segment-cache.ts';
 import { getMapTileDownloadUrl } from '../platform.ts';
@@ -38,6 +40,7 @@ import {
 function registerProtocols() {
   const protocol = new pmtiles.Protocol();
   maplibregl.addProtocol('pmtiles', protocol.tile);
+  getDemSource().setupMaplibre(maplibregl as any);
 
   const remotePMTiles = new Map<string, pmtiles.PMTiles>();
   const getRemoteArchive = (segmentId: string): pmtiles.PMTiles => {
@@ -297,6 +300,7 @@ export const MapView: React.FC<MapViewProps> = ({
     );
     map.addControl(tilePickerControl, 'top-right');
     tilePickerControl.setOffline(isOfflineMode);
+    map.addControl(legendControl, 'top-right');
     map.addControl(centerRouteControl, 'top-right');
     map.addControl(new maplibregl.AttributionControl({ compact: false }), 'bottom-right');
 
@@ -755,6 +759,7 @@ export const MapView: React.FC<MapViewProps> = ({
     prevStylePropsRef.current = { isOfflineMode, basemap, thunderforestKey };
 
     styleReadyRef.current = false;
+    registerProtocols();
     map.setMaxBounds(isOfflineMode ? UK_BOUNDS : null);
     tilePickerControl.setOffline(isOfflineMode);
     map.setStyle(

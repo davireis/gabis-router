@@ -93,9 +93,9 @@ export interface AvoidArea {
 export const MAX_ROUTE_SLOTS = 3;
 
 export const ROUTE_SLOT_COLORS = [
-  { line: '#3b82f6', casing: '#1e40af', soft: 'rgba(59, 130, 246, 0.14)', name: 'Blue' },
-  { line: '#a855f7', casing: '#6b21a8', soft: 'rgba(168, 85, 247, 0.14)', name: 'Purple' },
-  { line: '#f97316', casing: '#9a3412', soft: 'rgba(249, 115, 22, 0.14)', name: 'Orange' },
+  { line: '#2563eb', casing: '#1e3a8a', soft: 'rgba(37, 99, 235, 0.14)', name: 'Blue' },
+  { line: '#db2777', casing: '#831843', soft: 'rgba(219, 39, 119, 0.14)', name: 'Magenta' },
+  { line: '#ea580c', casing: '#7c2d12', soft: 'rgba(234, 88, 12, 0.14)', name: 'Orange' },
 ] as const;
 
 export interface RouteSlotState {

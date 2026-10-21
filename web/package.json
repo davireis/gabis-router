@@ -16,6 +16,7 @@
   "dependencies": {
     "@capacitor/android": "^7.3.0",
     "@capacitor/core": "^7.4.0",
+    "maplibre-contour": "^0.1.1",
     "maplibre-gl": "^4.7.1",
     "pmtiles": "^4.5.0",
     "protomaps-themes-base": "^4.5.0",

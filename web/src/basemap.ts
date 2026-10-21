@@ -1,6 +1,6 @@
-// Basemap style setting: standard vector map, CyclOSM, or OpenCycleMap.
+// Basemap style setting: GBRouter Light (standard), GBRouter Dense, CyclOSM, or OpenCycleMap.
 
-export type Basemap = 'standard' | 'cyclosm' | 'opencyclemap';
+export type Basemap = 'standard' | 'dense' | 'cyclosm' | 'opencyclemap';
 export type BasemapSetting = Basemap;
 
 const STORAGE_KEY = 'rsrouter_basemap';
@@ -11,8 +11,15 @@ const listeners: Array<() => void> = [];
 
 let basemap: Basemap = (() => {
   const stored = localStorage.getItem(STORAGE_KEY) as string | null;
-  if (stored === 'standard' || stored === 'cyclosm' || stored === 'opencyclemap') return stored;
-  return 'standard';
+  if (
+    stored === 'standard' ||
+    stored === 'dense' ||
+    stored === 'cyclosm' ||
+    stored === 'opencyclemap'
+  ) {
+    return stored;
+  }
+  return 'dense';
 })();
 
 const customStoredKey = localStorage.getItem(API_KEY_STORAGE);
