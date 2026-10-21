@@ -6,6 +6,7 @@ import {
   CACHE_CHANNEL_NAME,
   MIN_RD5_BYTES,
   UK_SEGMENTS,
+  OFFLINE_PMTILES_ARCHIVES,
   fetchAndCacheSegment,
   getLatestCachedSegmentDate,
   getCachedSegmentSize,
@@ -15,7 +16,7 @@ import { FONT_BASE_URL, FONT_NAMES, FONT_RANGES, ROUTING_FILES } from '../utils/
 import { getMapTileDownloadUrl } from '../platform.ts';
 import type { DownloadEvent, DownloadRequest } from '../download-worker.ts';
 
-const TILES_DONE_KEY = 'rsrouter_map_tiles_done';
+const TILES_DONE_KEY = 'rsrouter_map_tiles_done_v2';
 const OFFLINE_MODE_KEY = 'rsrouter_offline_mode';
 
 export interface OfflineBundleStatus {
@@ -85,7 +86,7 @@ export async function checkOfflineBundleStatus(): Promise<OfflineBundleStatus> {
   let hasAny = false;
   let hasPartialTiles = false;
 
-  for (const id of UK_SEGMENTS) {
+  for (const id of OFFLINE_PMTILES_ARCHIVES) {
     const file = await getTileFile(id);
     if (file) {
       totalBytes += file.size;
@@ -199,7 +200,7 @@ export function useOffline(
           }
         } catch {}
 
-        for (const id of UK_SEGMENTS) {
+        for (const id of OFFLINE_PMTILES_ARCHIVES) {
           try {
             const file = await getTileFile(id);
             if (file && !loadedPMTiles.has(id)) {
@@ -342,21 +343,22 @@ export function useOffline(
       }
 
       // 4. Map Tiles
-      for (let i = 0; i < n; i++) {
-        const segId = UK_SEGMENTS[i];
+      const m = OFFLINE_PMTILES_ARCHIVES.length;
+      for (let i = 0; i < m; i++) {
+        const segId = OFFLINE_PMTILES_ARCHIVES[i];
         setDownloadProgress({
           active: true,
-          percent: Math.min(99, Math.round(20 + (i / n) * 80)),
-          message: `Map tiles ${i + 1}/${n}: ${segId} (preparing, this can take a few minutes)`,
+          percent: Math.min(99, Math.round(20 + (i / m) * 80)),
+          message: `Map tiles ${i + 1}/${m}: ${segId} (preparing, this can take a few minutes)`,
         });
         await downloadMapTilesForSegment(segId, (done, total) => {
           const frac = total > 0 ? done / total : 0;
-          const pct = Math.min(99, Math.round(20 + ((i + frac) / n) * 80));
+          const pct = Math.min(99, Math.round(20 + ((i + frac) / m) * 80));
           const totalLabel = total > 0 ? formatMb(total) : '?';
           setDownloadProgress({
             active: true,
             percent: pct,
-            message: `Map tiles ${i + 1}/${n}: ${segId} (${formatMb(done)} / ${totalLabel} MB)`,
+            message: `Map tiles ${i + 1}/${m}: ${segId} (${formatMb(done)} / ${totalLabel} MB)`,
           });
         });
       }
@@ -391,7 +393,7 @@ export function useOffline(
       setOfflineMode(false);
     }
     onStatusChangeRef.current('Removing offline data...');
-    for (const segId of UK_SEGMENTS) {
+    for (const segId of OFFLINE_PMTILES_ARCHIVES) {
       await deleteTileFile(segId, loadedPMTiles);
     }
     await clearAllCachedSegments();

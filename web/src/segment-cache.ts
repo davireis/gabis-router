@@ -5,7 +5,7 @@
 import { getSegmentDownloadUrl } from './platform.ts';
 
 export const SEGMENT_CACHE_NAME = 'rsrouter-segments-v3';
-export const MAP_TILES_CACHE_NAME = 'rsrouter-map-tiles-v1';
+export const MAP_TILES_CACHE_NAME = 'rsrouter-map-tiles-v2';
 export const MIN_RD5_BYTES = 50000;
 
 export const UK_SEGMENTS = [
@@ -17,6 +17,38 @@ export const UK_SEGMENTS = [
   'W5_N60',  // Shetland
   'E0_N50',  // East England
 ];
+
+export const CYCLE_ROUTES_ARCHIVE = 'cycle_routes';
+export const OFFLINE_PMTILES_ARCHIVES = [...UK_SEGMENTS, CYCLE_ROUTES_ARCHIVE];
+
+const UK_SEGMENT_BOUNDS: ReadonlyArray<readonly [string, number, number, number, number]> = [
+  ['W5_N50', -5, 50, 0, 55],
+  ['E0_N50', 0, 50, 5, 55],
+  ['W5_N55', -5, 55, 0, 60],
+  ['W10_N50', -10, 50, -5, 55],
+  ['W10_N55', -10, 55, -5, 60],
+  ['W15_N50', -15, 50, -10, 55],
+  ['W5_N60', -5, 60, 0, 65],
+];
+
+/**
+ * Returns the 5°×5° segment IDs whose bounding box intersects Web Mercator tile (z, x, y).
+ */
+export function segmentsForTile(z: number, x: number, y: number): string[] {
+  const n = 2 ** z;
+  const minLon = (x / n) * 360 - 180;
+  const maxLon = ((x + 1) / n) * 360 - 180;
+  const maxLat = (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n))) * 180) / Math.PI;
+  const minLat = (Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + 1)) / n))) * 180) / Math.PI;
+
+  const matches: string[] = [];
+  for (const [id, sMinLon, sMinLat, sMaxLon, sMaxLat] of UK_SEGMENT_BOUNDS) {
+    if (maxLon >= sMinLon && minLon <= sMaxLon && maxLat >= sMinLat && minLat <= sMaxLat) {
+      matches.push(id);
+    }
+  }
+  return matches;
+}
 
 export function isHtml(res: Response): boolean {
   return (res.headers.get('content-type') || '').includes('text/html');

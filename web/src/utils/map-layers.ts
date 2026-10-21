@@ -103,21 +103,33 @@ export function syncRoutesLayers(map: maplibregl.Map, slots: RouteSlotState[]) {
         type: 'line',
         source: sourceId,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-opacity': 0.92 },
+        paint: {
+          'line-color': '#f8f4f0',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 4.5, 12, 5.5, 16, 7.0],
+          'line-opacity': 0.9,
+        },
       });
       map.addLayer({
         id: casingId,
         type: 'line',
         source: sourceId,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': color.casing, 'line-width': 6.5, 'line-opacity': 0.9 },
+        paint: {
+          'line-color': color.casing,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 3.4, 12, 4.2, 16, 5.4],
+          'line-opacity': 0.9,
+        },
       });
       map.addLayer({
         id: lineId,
         type: 'line',
         source: sourceId,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': color.line, 'line-width': 4.5, 'line-opacity': 1 },
+        paint: {
+          'line-color': color.line,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 2.2, 12, 2.8, 16, 3.8],
+          'line-opacity': 1,
+        },
       });
     }
   }
@@ -142,7 +154,27 @@ export function syncRoutesLayers(map: maplibregl.Map, slots: RouteSlotState[]) {
   ensureRouteLayerOrder(map);
 }
 
+function getFirstLabelLayerId(map: maplibregl.Map): string | undefined {
+  const preferred = [
+    'waterway_line_label',
+    'highway-name-path',
+    'highway-name-minor',
+    'highway-name-major',
+    'ocm-route-label-mtb',
+  ];
+  for (const id of preferred) {
+    if (map.getLayer(id)) return id;
+  }
+  const layers = map.getStyle()?.layers;
+  if (layers) {
+    const firstSymbol = layers.find((l) => l.type === 'symbol');
+    if (firstSymbol) return firstSymbol.id;
+  }
+  return undefined;
+}
+
 function ensureRouteLayerOrder(map: maplibregl.Map) {
+  const beforeId = getFirstLabelLayerId(map);
   const orderedIds = [
     'route-2-halo',
     'route-2-casing',
@@ -159,7 +191,7 @@ function ensureRouteLayerOrder(map: maplibregl.Map) {
   ];
   for (const id of orderedIds) {
     if (map.getLayer(id)) {
-      map.moveLayer(id);
+      map.moveLayer(id, beforeId);
     }
   }
 }
@@ -178,33 +210,40 @@ export function syncHighlightLayer(map: maplibregl.Map, highlight: SegmentHighli
       }
     : EMPTY_FC;
 
+  const beforeId = getFirstLabelLayerId(map);
   const source = map.getSource('route-segment-highlight') as maplibregl.GeoJSONSource | undefined;
   if (source) {
     source.setData(data);
     if (highlight && highlight.coordinates.length > 0) {
-      if (map.getLayer('route-segment-halo')) map.moveLayer('route-segment-halo');
-      if (map.getLayer('route-segment-line')) map.moveLayer('route-segment-line');
+      if (map.getLayer('route-segment-halo')) map.moveLayer('route-segment-halo', beforeId);
+      if (map.getLayer('route-segment-line')) map.moveLayer('route-segment-line', beforeId);
     }
   } else {
     map.addSource('route-segment-highlight', { type: 'geojson', data });
-    map.addLayer({
-      id: 'route-segment-halo',
-      type: 'line',
-      source: 'route-segment-highlight',
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#ffffff', 'line-width': 11, 'line-opacity': 0.95 },
-    });
-    map.addLayer({
-      id: 'route-segment-line',
-      type: 'line',
-      source: 'route-segment-highlight',
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: {
-        'line-color': ['coalesce', ['get', 'color'], '#f59e0b'],
-        'line-width': 6.5,
-        'line-opacity': 1.0,
+    map.addLayer(
+      {
+        id: 'route-segment-halo',
+        type: 'line',
+        source: 'route-segment-highlight',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#f8f4f0', 'line-width': 8, 'line-opacity': 0.95 },
       },
-    });
+      beforeId,
+    );
+    map.addLayer(
+      {
+        id: 'route-segment-line',
+        type: 'line',
+        source: 'route-segment-highlight',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': ['coalesce', ['get', 'color'], '#f59e0b'],
+          'line-width': 4.8,
+          'line-opacity': 1.0,
+        },
+      },
+      beforeId,
+    );
   }
 }
 

@@ -36,7 +36,7 @@ CORS_RULES = {
                     "capacitor://localhost",
                 ],
                 "methods": ["GET", "HEAD"],
-                "headers": ["Range", "If-None-Match", "Content-Type"],
+                "headers": ["*"],
             },
             "exposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges", "ETag"],
             "maxAgeSeconds": 86400,
@@ -92,15 +92,37 @@ def parse_segment_bbox(segment_id: str):
     return min_lon, min_lat, min_lon + 5, min_lat + 5
 
 
-def latest_protomaps_build_url() -> str:
+def latest_openfreemap_build_url() -> str:
     req = urllib.request.Request(
-        "https://maps.protomaps.com/builds.json",
+        "https://btrfs.openfreemap.com/files.txt",
         headers={"User-Agent": "rsrouter-r2-sync"},
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
-        builds = json.load(resp)
-    latest = builds[-1]["key"]
-    return f"https://build.protomaps.com/{latest}"
+        lines = resp.read().decode("utf-8").splitlines()
+    pmtiles_lines = [line.strip() for line in lines if line.strip().endswith("/tiles.pmtiles")]
+    if not pmtiles_lines:
+        raise RuntimeError("No tiles.pmtiles entry found in https://btrfs.openfreemap.com/files.txt")
+    return f"https://btrfs.openfreemap.com/{pmtiles_lines[-1]}"
+
+
+def build_cycle_routes_pmtiles():
+    MAP_TILES_DIR.mkdir(parents=True, exist_ok=True)
+    refs_bin = REPO_ROOT / "data" / "cycle_refs.bin"
+    if not refs_bin.exists():
+        run([sys.executable, str(REPO_ROOT / "tools" / "fetch_cycle_refs.py"), str(refs_bin)])
+    run([
+        "cargo",
+        "run",
+        "--release",
+        "--manifest-path",
+        str(REPO_ROOT / "crates" / "route-tools" / "Cargo.toml"),
+        "--bin",
+        "build_cycle_tiles",
+        "--",
+        str(SEGMENTS_DIR),
+        str(REPO_ROOT / "web" / "public" / "profiles" / "lookups.dat"),
+        str(MAP_TILES_DIR / "cycle_routes.pmtiles"),
+    ])
 
 
 def download_rd5_segments(segments):
@@ -259,6 +281,11 @@ def upload_files(bucket: str, segments, upload_rd5: bool, upload_pmtiles: bool):
             else:
                 upload_small_file(bucket, key, fp, "application/octet-stream")
 
+    if upload_rd5 or upload_pmtiles:
+        cycle_fp = MAP_TILES_DIR / "cycle_routes.pmtiles"
+        if cycle_fp.exists():
+            upload_small_file(bucket, "map-tiles/cycle_routes.pmtiles", cycle_fp, "application/vnd.pmtiles")
+
     if upload_pmtiles:
         for seg in segments:
             fp = MAP_TILES_DIR / f"{seg}.pmtiles"
@@ -295,9 +322,12 @@ def main():
     if not args.upload_only:
         if do_rd5:
             download_rd5_segments(args.segments)
+            build_cycle_routes_pmtiles()
         if do_pmtiles:
-            planet = args.planet_url or latest_protomaps_build_url()
+            planet = args.planet_url or latest_openfreemap_build_url()
             extract_pmtiles_segments(args.segments, planet)
+            if not do_rd5:
+                build_cycle_routes_pmtiles()
 
     if do_rd5 or do_pmtiles:
         upload_files(args.bucket, args.segments, do_rd5, do_pmtiles)

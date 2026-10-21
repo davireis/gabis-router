@@ -13,11 +13,18 @@ import {
 } from '../types.ts';
 import type { Basemap } from '../basemap.ts';
 import type { SegmentHighlight } from '../utils/classification.ts';
-import { getOfflineStyle, getOnlineStyle, UK_CENTER, UK_BOUNDS } from '../utils/map-styles.ts';
+import {
+  getOfflineStyle,
+  getOnlineStyle,
+  registerCycleShieldImages,
+  UK_CENTER,
+  UK_BOUNDS,
+} from '../utils/map-styles.ts';
 import { tilePickerControl } from '../tile-picker.ts';
 import { centerRouteControl } from '../center-control.ts';
 import { loadedPMTiles, archivesReady } from '../hooks/useOffline.ts';
-import { MAP_TILES_CACHE_NAME } from '../segment-cache.ts';
+import { CYCLE_ROUTES_ARCHIVE, MAP_TILES_CACHE_NAME, segmentsForTile } from '../segment-cache.ts';
+import { getMapTileDownloadUrl } from '../platform.ts';
 import { showMenu, hideMenu, menuClosedWithin, type MenuItem } from '../menu.ts';
 import { distanceMeters, legIndexAt, nearestVertex } from '../utils/geo.ts';
 import {
@@ -27,15 +34,22 @@ import {
   fitRouteBounds,
 } from '../utils/map-layers.ts';
 
-// Register PMTiles protocols once globally
+// Register PMTiles protocols
 function registerProtocols() {
-  if ((window as any).__rsrouterProtocolsRegistered) return;
-  (window as any).__rsrouterProtocolsRegistered = true;
-
   const protocol = new pmtiles.Protocol();
   maplibregl.addProtocol('pmtiles', protocol.tile);
 
-  maplibregl.addProtocol('pmtiles-composite', async (params) => {
+  const remotePMTiles = new Map<string, pmtiles.PMTiles>();
+  const getRemoteArchive = (segmentId: string): pmtiles.PMTiles => {
+    let archive = remotePMTiles.get(segmentId);
+    if (!archive) {
+      archive = new pmtiles.PMTiles(getMapTileDownloadUrl(segmentId));
+      remotePMTiles.set(segmentId, archive);
+    }
+    return archive;
+  };
+
+  maplibregl.addProtocol('pmtiles-composite', async (params, abortController) => {
     const match = params.url.match(/pmtiles-composite:\/\/(\d+)\/(\d+)\/(\d+)\.pbf/);
     if (!match) return { data: new Uint8Array(0) };
     const z = parseInt(match[1], 10);
@@ -44,12 +58,82 @@ function registerProtocols() {
 
     await archivesReady;
 
-    for (const p of loadedPMTiles.values()) {
-      const tile = await p.getZxy(z, x, y);
+    const candidateSegments = segmentsForTile(z, x, y);
+    for (const seg of candidateSegments) {
+      const local = loadedPMTiles.get(seg);
+      if (local) {
+        const tile = await local.getZxy(z, x, y);
+        if (tile && tile.data) {
+          return { data: tile.data };
+        }
+      }
+    }
+
+    for (const [seg, local] of loadedPMTiles.entries()) {
+      if (candidateSegments.includes(seg)) continue;
+      const tile = await local.getZxy(z, x, y);
       if (tile && tile.data) {
         return { data: tile.data };
       }
     }
+
+    const isOffline = localStorage.getItem('rsrouter_offline_mode') === 'true';
+    if (!isOffline) {
+      for (const seg of candidateSegments) {
+        if (loadedPMTiles.has(seg)) continue;
+        try {
+          const tile = await getRemoteArchive(seg).getZxy(z, x, y, abortController?.signal);
+          if (tile && tile.data) {
+            return { data: tile.data };
+          }
+        } catch {
+          // Ignore network/abort errors and try next matching segment
+        }
+      }
+    }
+
+    return { data: new Uint8Array(0) };
+  });
+
+  maplibregl.addProtocol('pmtiles-cycle', async (params, abortController) => {
+    const match = params.url.match(/pmtiles-cycle:\/\/(\d+)\/(\d+)\/(\d+)\.pbf/);
+    if (!match) return { data: new Uint8Array(0) };
+    const z = parseInt(match[1], 10);
+    const x = parseInt(match[2], 10);
+    const y = parseInt(match[3], 10);
+
+    await archivesReady;
+
+    const isOffline = localStorage.getItem('rsrouter_offline_mode') === 'true';
+    const preferRemoteInDev = import.meta.env.DEV && !isOffline;
+
+    if (!preferRemoteInDev) {
+      const local = loadedPMTiles.get(CYCLE_ROUTES_ARCHIVE);
+      if (local) {
+        const tile = await local.getZxy(z, x, y);
+        if (tile && tile.data) {
+          return { data: tile.data };
+        }
+        return { data: new Uint8Array(0) };
+      }
+    }
+
+    if (!isOffline) {
+      try {
+        const tile = await getRemoteArchive(CYCLE_ROUTES_ARCHIVE).getZxy(
+          z,
+          x,
+          y,
+          abortController?.signal,
+        );
+        if (tile && tile.data) {
+          return { data: tile.data };
+        }
+      } catch {
+        // Ignore network/abort errors
+      }
+    }
+
     return { data: new Uint8Array(0) };
   });
 
@@ -189,7 +273,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: isOfflineMode ? getOfflineStyle() : getOnlineStyle(basemap, thunderforestKey),
+      style: isOfflineMode ? getOfflineStyle(basemap) : getOnlineStyle(basemap, thunderforestKey),
       center: UK_CENTER,
       zoom: 6,
       maxBounds: isOfflineMode ? UK_BOUNDS : undefined,
@@ -199,7 +283,10 @@ export const MapView: React.FC<MapViewProps> = ({
     mapRef.current = map;
     (window as any).map = map;
 
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+    map.addControl(
+      new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }),
+      'top-right',
+    );
     map.addControl(
       new maplibregl.GeolocateControl({
         positionOptions: { enableHighAccuracy: true },
@@ -223,6 +310,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
     const onStyleLoad = () => {
       styleReadyRef.current = true;
+      registerCycleShieldImages(map);
       drawAllLayers();
       if (pendingFitRouteRef.current) {
         pendingFitRouteRef.current = false;
@@ -245,6 +333,10 @@ export const MapView: React.FC<MapViewProps> = ({
     });
 
     map.on('styleimagemissing', (e) => {
+      if (e.id.startsWith('cycle-shield-')) {
+        registerCycleShieldImages(map);
+        return;
+      }
       if (!map.hasImage(e.id)) {
         map.addImage(e.id, { width: 1, height: 1, data: new Uint8Array(4) });
       }
@@ -666,7 +758,7 @@ export const MapView: React.FC<MapViewProps> = ({
     map.setMaxBounds(isOfflineMode ? UK_BOUNDS : null);
     tilePickerControl.setOffline(isOfflineMode);
     map.setStyle(
-      isOfflineMode ? getOfflineStyle() : getOnlineStyle(basemap, thunderforestKey),
+      isOfflineMode ? getOfflineStyle(basemap) : getOnlineStyle(basemap, thunderforestKey),
       { diff: false },
     );
   }, [isOfflineMode, basemap, thunderforestKey]);

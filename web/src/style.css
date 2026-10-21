@@ -110,7 +110,11 @@ body,
   z-index: 10;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+}
+
+#map .maplibregl-ctrl-top-right .maplibregl-ctrl {
+  margin: 0 !important;
 }
 
 #map .maplibregl-ctrl-group {
@@ -119,16 +123,34 @@ body,
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border-2);
   border-radius: 10px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-panel);
   overflow: visible;
 }
 
 #map .maplibregl-ctrl-group button {
   width: 34px;
   height: 34px;
+  color: var(--text);
+  transition: background-color 0.15s ease;
+}
+
+#map .maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--border-2);
+}
+
+#map .maplibregl-ctrl-group button:not(:disabled):hover {
+  background-color: var(--surface-2);
 }
 
 #map .maplibregl-ctrl-group button:first-child {
+  border-radius: 9px 9px 0 0;
+}
+
+#map .maplibregl-ctrl-group button:last-child {
+  border-radius: 0 0 9px 9px;
+}
+
+#map .maplibregl-ctrl-group button:only-child {
   border-radius: 9px;
 }
 
@@ -2222,12 +2244,19 @@ body,
 }
 
 .maplibregl-ctrl-tile-picker.active {
-  background-color: rgba(0, 0, 0, 0.08);
+  background-color: var(--accent-soft);
 }
 
+:root[data-theme="dark"] .maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon,
+:root[data-theme="dark"] .maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon,
+:root[data-theme="dark"] .maplibregl-ctrl-geolocate:not(.maplibregl-ctrl-geolocate-active):not(.maplibregl-ctrl-geolocate-background) .maplibregl-ctrl-icon,
 :root[data-theme="dark"] .maplibregl-ctrl-center-route .maplibregl-ctrl-icon,
 :root[data-theme="dark"] .maplibregl-ctrl-tile-picker .maplibregl-ctrl-icon {
-  filter: invert(1);
+  filter: invert(1) brightness(1.1);
+}
+
+:root[data-theme="dark"] .maplibregl-ctrl-compass .maplibregl-ctrl-icon {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' viewBox='0 0 29 29'%3E%3Cpath fill='%23f87171' d='M10.5 14l4-8 4 8h-8z'/%3E%3Cpath fill='%23cbd5e1' d='M10.5 16l4 8 4-8h-8z'/%3E%3C/svg%3E") !important;
 }
 
 .tile-picker-menu {

@@ -12,7 +12,7 @@ const listeners: Array<() => void> = [];
 let basemap: Basemap = (() => {
   const stored = localStorage.getItem(STORAGE_KEY) as string | null;
   if (stored === 'standard' || stored === 'cyclosm' || stored === 'opencyclemap') return stored;
-  return 'opencyclemap';
+  return 'standard';
 })();
 
 const customStoredKey = localStorage.getItem(API_KEY_STORAGE);

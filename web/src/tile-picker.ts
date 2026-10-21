@@ -102,8 +102,8 @@ export class TilePickerControl implements maplibregl.IControl {
     const current = getBasemap();
     const options: { id: Basemap; label: string; desc: string }[] = [
       { id: 'standard', label: 'Standard', desc: 'Vector map' },
+      { id: 'opencyclemap', label: 'OpenCycleMap', desc: 'NCN, RCN & LCN routes' },
       { id: 'cyclosm', label: 'CyclOSM', desc: 'Bicycle infrastructure' },
-      { id: 'opencyclemap', label: 'OpenCycleMap', desc: 'Thunderforest topo' },
     ];
 
     this.menu.innerHTML = `
@@ -111,7 +111,7 @@ export class TilePickerControl implements maplibregl.IControl {
       ${options
         .map((opt) => {
           const isActive = current === opt.id;
-          const isDisabled = this.isOffline && opt.id !== 'standard';
+          const isDisabled = this.isOffline && opt.id === 'cyclosm';
           return `
             <button
               type="button"

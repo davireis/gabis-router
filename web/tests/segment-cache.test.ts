@@ -2,7 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { getRd5CreationDate, isHtml, SEGMENT_CACHE_NAME, UK_SEGMENTS } from '../src/segment-cache.ts';
+import {
+  getRd5CreationDate,
+  isHtml,
+  SEGMENT_CACHE_NAME,
+  segmentsForTile,
+  UK_SEGMENTS,
+} from '../src/segment-cache.ts';
 
 test('getRd5CreationDate returns null for short buffer', () => {
   const buf = new ArrayBuffer(100);
@@ -55,4 +61,13 @@ test('cache configuration constants', () => {
   assert.equal(SEGMENT_CACHE_NAME, 'rsrouter-segments-v3');
   assert.ok(UK_SEGMENTS.includes('E0_N50'));
   assert.ok(UK_SEGMENTS.includes('W5_N50'));
+});
+
+test('segmentsForTile maps Web Mercator tiles to matching 5x5 UK segments', () => {
+  const londonSegs = segmentsForTile(10, 512, 340);
+  assert.ok(londonSegs.includes('E0_N50'));
+
+  assert.deepEqual(segmentsForTile(10, 505, 331), ['W5_N50']);
+  assert.deepEqual(segmentsForTile(10, 502, 319), ['W5_N55']);
+  assert.deepEqual(segmentsForTile(10, 301, 385), []);
 });

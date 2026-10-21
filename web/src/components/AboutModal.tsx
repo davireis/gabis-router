@@ -91,6 +91,23 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
           </div>
 
           <div>
+            <h3>Safety disclaimer</h3>
+            <p>
+              Routes are generated automatically from community OpenStreetMap data and may include private land, closed
+              paths, rough terrain, or unsafe roads. Always check road signs and surface conditions on the ground. You
+              are responsible for your own safety and for following local traffic laws, including{' '}
+              <a
+                href="https://www.gov.uk/guidance/the-highway-code/rules-for-cyclists-59-to-82"
+                target="_blank"
+                rel="noopener"
+              >
+                The Highway Code
+              </a>
+              .
+            </p>
+          </div>
+
+          <div>
             <h3>Open source credits</h3>
             <p style={{ marginBottom: '6px' }}>
               GBRouter builds on great work by the open source mapping and cycling community:

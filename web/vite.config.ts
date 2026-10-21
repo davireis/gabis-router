@@ -14,7 +14,7 @@ const hasHttpsCerts = fs.existsSync(keyPath) && fs.existsSync(certPath);
 // copied into dist/ on every build.
 const mapTilesDir = path.join(__dirname, 'map-tiles');
 const pmtilesCli = path.resolve(__dirname, '..', 'tools', 'pmtiles');
-const PLANET_PMTILES = 'https://build.protomaps.com/20261001.pmtiles';
+const PLANET_PMTILES = 'https://btrfs.openfreemap.com/areas/planet/20261018_080001_pt/tiles.pmtiles';
 
 const activeExtractions = new Map<string, Promise<void>>();
 
@@ -67,20 +67,27 @@ const serveMapTiles: Connect.NextHandleFunction = async (req, res, next) => {
   }
 
   const rawUrl = req.url.split('?')[0];
-  const match = rawUrl.match(/^\/map-tiles\/(([EW])(\d+)_([NS])(\d+))\.pmtiles$/);
-  if (!match) {
+  const segMatch = rawUrl.match(/^\/map-tiles\/(([EW])(\d+)_([NS])(\d+))\.pmtiles$/);
+  const cycleMatch = rawUrl.match(/^\/map-tiles\/(cycle_routes)\.pmtiles$/);
+  if (!segMatch && !cycleMatch) {
     res.statusCode = 404;
     res.setHeader('Content-Type', 'text/plain');
     res.end(`Unknown map tile segment: ${rawUrl}`);
     return;
   }
 
-  const segmentId = match[1];
+  const segmentId = segMatch ? segMatch[1] : cycleMatch![1];
   const localPath = path.join(mapTilesDir, `${segmentId}.pmtiles`);
 
   if (!fs.existsSync(localPath)) {
-    const minLon = match[2] === 'W' ? -parseInt(match[3], 10) : parseInt(match[3], 10);
-    const minLat = match[4] === 'S' ? -parseInt(match[5], 10) : parseInt(match[5], 10);
+    if (!segMatch) {
+      res.statusCode = 404;
+      res.setHeader('Content-Type', 'text/plain');
+      res.end(`Missing ${segmentId}.pmtiles in web/map-tiles/`);
+      return;
+    }
+    const minLon = segMatch[2] === 'W' ? -parseInt(segMatch[3], 10) : parseInt(segMatch[3], 10);
+    const minLat = segMatch[4] === 'S' ? -parseInt(segMatch[5], 10) : parseInt(segMatch[5], 10);
     try {
       await extractSegment(segmentId, [minLon, minLat, minLon + 5, minLat + 5], localPath);
     } catch (err: any) {
@@ -92,8 +99,34 @@ const serveMapTiles: Connect.NextHandleFunction = async (req, res, next) => {
   }
 
   const { size } = fs.statSync(localPath);
-  res.statusCode = 200;
   res.setHeader('Content-Type', 'application/vnd.pmtiles');
+  res.setHeader('Accept-Ranges', 'bytes');
+
+  const rangeHeader = req.headers.range;
+  if (rangeHeader) {
+    const m = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+    if (m) {
+      const start = parseInt(m[1], 10);
+      const end = m[2] ? Math.min(parseInt(m[2], 10), size - 1) : size - 1;
+      if (start >= size || start > end) {
+        res.statusCode = 416;
+        res.setHeader('Content-Range', `bytes */${size}`);
+        res.end();
+        return;
+      }
+      res.statusCode = 206;
+      res.setHeader('Content-Range', `bytes ${start}-${end}/${size}`);
+      res.setHeader('Content-Length', String(end - start + 1));
+      if (req.method === 'HEAD') {
+        res.end();
+        return;
+      }
+      fs.createReadStream(localPath, { start, end }).pipe(res);
+      return;
+    }
+  }
+
+  res.statusCode = 200;
   res.setHeader('Content-Length', String(size));
   if (req.method === 'HEAD') {
     res.end();
