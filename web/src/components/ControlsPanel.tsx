@@ -6,12 +6,12 @@ import {
   PROFILE_INFO,
   PROFILE_ORDER,
   ROUTE_SLOT_COLORS,
+  type LatLon,
   type ProfileName,
 } from '../types.ts';
 import { routeToGpx, downloadGpxFile } from '../utils/gpx.ts';
 import { getShareableRouteUrl, isNativePlatform } from '../platform.ts';
 import { Header } from './Header.tsx';
-import { PlaceSearch } from './PlaceSearch.tsx';
 import { WaypointList } from './WaypointList.tsx';
 import { InfoButton } from './TooltipPopover.tsx';
 import { Icon } from './common/Icon.tsx';
@@ -54,7 +54,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
     e.target.value = '';
   };
 
-  const handleStartFromMyLocation = () => {
+  const handleUseMyLocationAt = (onResolved: (point: LatLon) => void) => {
     if (!('geolocation' in navigator)) {
       routing.setStatus('This browser cannot find your location.', true);
       return;
@@ -62,12 +62,11 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
     routing.setStatus('Finding your location...');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const here = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-        const shouldFly = routing.waypoints.length < 2;
-        routing.addWaypoint(here, 'start');
-        if (shouldFly) {
-          onFlyTo?.(here.lon, here.lat);
-        }
+        onResolved({
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+          name: 'My location',
+        });
       },
       (err) => {
         const GEOLOCATION_ERRORS: Record<number, string> = {
@@ -82,6 +81,20 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
     );
+  };
+
+  const handleSetWaypointAt = (
+    index: number,
+    point: LatLon,
+    mode: 'replace' | 'insert-start' | 'append',
+  ) => {
+    if (mode === 'replace') {
+      routing.moveWaypoint(index, point);
+    } else if (mode === 'insert-start') {
+      routing.insertWaypointAtLeg(point, 0);
+    } else {
+      routing.addWaypoint(point, 'append');
+    }
   };
 
   const handleShare = async () => {
@@ -134,7 +147,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
       <div className="route-section" ref={routeSectionRef}>
         <div className="field profile-field">
           <div className="profile-field-header">
-            <label htmlFor="profile-select">
+            <label htmlFor="profile-select" className="profile-header-label">
               <span>{routing.slots.length > 1 ? 'Profiles' : 'Profile'}</span>
               <InfoButton
                 tooltip={`${PROFILE_INFO[routing.profile]?.summary || ''} Profiles score every road segment by surface, traffic, hills, and cycle infrastructure. Add up to 3 profiles to compare routes side by side.`}
@@ -146,10 +159,10 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
                 id="btn-add-compare-profile"
                 type="button"
                 className="btn-toolbar-mini btn-add-profile"
-                title="Add another routing profile to compare (up to 3)"
+                title="Compare with another routing profile (up to 3)"
                 onClick={() => routing.addProfileSlot()}
               >
-                <span>+ Compare profile</span>
+                <span>+ Compare</span>
               </button>
             )}
           </div>
@@ -194,18 +207,11 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
           </div>
         </div>
 
-        <PlaceSearch
-          isOfflineMode={offline.isOfflineMode}
-          getMapCenter={getMapCenter}
-          onFlyTo={onFlyTo}
-          onStartFromMyLocation={handleStartFromMyLocation}
-          onSelectPlace={(point, action) => {
-            routing.addWaypoint(point, action);
-          }}
-        />
+        <div className="waypoints-top-bar">
+          <div className="waypoints-top-left">
+            <span className="waypoints-heading">Waypoints</span>
+          </div>
 
-        <div className="waypoints-header">
-          <span className="waypoints-title">Waypoints</span>
           <div className="route-toolbar-group">
             <input
               ref={importFileInputRef}
@@ -219,12 +225,12 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
               id="btn-import-gpx"
               type="button"
               className="btn-toolbar-mini"
-              title="Import GPX as editable route"
-              aria-label="Import GPX"
+              title="Upload GPX as editable route"
+              aria-label="Upload GPX"
               onClick={() => importFileInputRef.current?.click()}
             >
               <Icon name="upload" size={12} />
-              <span>Import GPX</span>
+              <span>Upload GPX</span>
             </button>
             <button
               id="btn-undo"
@@ -249,17 +255,6 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
               <Icon name="redo" size={13} />
             </button>
             <button
-              id="btn-reverse-route"
-              type="button"
-              className="btn-toolbar-mini"
-              title="Reverse route direction"
-              aria-label="Reverse route"
-              disabled={routing.waypoints.length < 2}
-              onClick={routing.reverseRoute}
-            >
-              <Icon name="reverse" size={13} />
-            </button>
-            <button
               id="btn-clear-route"
               type="button"
               className="btn-toolbar-mini btn-toolbar-clear"
@@ -277,9 +272,14 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
         <WaypointList
           waypoints={routing.waypoints}
           avoidAreas={routing.avoidAreas}
+          isOfflineMode={offline.isOfflineMode}
           editingWaypointIndex={editingWaypointIndex}
           onClearEditingWaypoint={onClearEditingWaypoint}
+          getMapCenter={getMapCenter}
+          onSetWaypointAt={handleSetWaypointAt}
+          onUseMyLocationAt={handleUseMyLocationAt}
           onReorder={routing.reorderWaypoints}
+          onReverse={routing.reverseRoute}
           onRemove={routing.removeWaypoint}
           onRename={routing.renameWaypoint}
           onRemoveAvoidArea={routing.removeAvoidArea}

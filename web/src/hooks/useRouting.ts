@@ -118,7 +118,7 @@ function mergeSavedWaypointNames(waypoints: LatLon[], saved: LatLon[] | undefine
 
 export function useRouting(isOfflineMode: boolean) {
   const [slots, setSlotsState] = useState<RouteSlotState[]>([
-    { profile: 'fastbike-lowtraffic', alternativeIdx: 0, route: null, isRouting: false },
+    { profile: PROFILE_ORDER[0], alternativeIdx: 0, route: null, isRouting: false },
   ]);
   const [waypoints, setWaypointsState] = useState<LatLon[]>([]);
   const [avoidAreas, setAvoidAreasState] = useState<AvoidArea[]>([]);
@@ -155,7 +155,7 @@ export function useRouting(isOfflineMode: boolean) {
   }, []);
 
   const saveToUrlAndStorage = useCallback((wps: LatLon[], profs: ProfileName[], avoids: AvoidArea[]) => {
-    const safeProfs: ProfileName[] = profs.length > 0 ? profs : ['fastbike-lowtraffic'];
+    const safeProfs: ProfileName[] = profs.length > 0 ? profs : [PROFILE_ORDER[0]];
     try {
       localStorage.setItem(
         STORAGE_KEY,
@@ -414,7 +414,7 @@ export function useRouting(isOfflineMode: boolean) {
           ? initial.profiles
           : saved?.profiles && saved.profiles.length > 0
           ? saved.profiles
-          : ['fastbike-lowtraffic'];
+          : [PROFILE_ORDER[0]];
 
       const initSlots: RouteSlotState[] = initProfs.map((p) => ({
         profile: p,
@@ -733,9 +733,9 @@ export function useRouting(isOfflineMode: boolean) {
 
   const moveWaypoint = useCallback(
     (index: number, p: LatLon) => {
-      // Moving a point clears its old cached place name so reverse geocoding can resolve the new location
+      // Moving a point on the map clears its old cached place name unless a new name is explicitly provided
       const next = waypointsRef.current.map((w, i) =>
-        i === index ? { lat: p.lat, lon: p.lon } : w,
+        i === index ? (p.name ? { lat: p.lat, lon: p.lon, name: p.name } : { lat: p.lat, lon: p.lon }) : w,
       );
       setWaypoints(next, true);
     },
@@ -945,7 +945,7 @@ export function useRouting(isOfflineMode: boolean) {
       id,
       payload: {
         gpxXml,
-        profile: nextSlots[0]?.profile || 'fastbike-lowtraffic',
+        profile: nextSlots[0]?.profile || PROFILE_ORDER[0],
         toleranceM,
       },
     } satisfies WorkerMessage);
@@ -964,7 +964,7 @@ export function useRouting(isOfflineMode: boolean) {
   );
 
   const primarySlot = slots[0] || {
-    profile: 'fastbike-lowtraffic' as ProfileName,
+    profile: PROFILE_ORDER[0],
     alternativeIdx: 0,
     route: null,
     isRouting: false,

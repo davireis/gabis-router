@@ -34,14 +34,17 @@ export const App: React.FC = () => {
   const [segmentHighlight, setSegmentHighlight] = useState<SegmentHighlight | null>(null);
   const [editingWaypointIndex, setEditingWaypointIndex] = useState<number | null>(null);
 
-  // Auto-collapse controls panel on mobile when route is first computed
+  // Auto-open route info drawer (and auto-collapse controls panel on mobile) when route is first computed
   const hadRouteRef = useRef<boolean>(false);
   useEffect(() => {
     setHoverPosition(null);
     setSegmentHighlight(null);
     const hasRoute = !!routing.currentRoute;
-    if (hasRoute && !hadRouteRef.current && window.innerWidth <= 860) {
-      setIsControlsCollapsed(true);
+    if (hasRoute && !hadRouteRef.current) {
+      setIsRouteInfoCollapsed(false);
+      if (window.innerWidth <= 860) {
+        setIsControlsCollapsed(true);
+      }
     }
     hadRouteRef.current = hasRoute;
   }, [routing.currentRoute]);

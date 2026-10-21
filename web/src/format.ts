@@ -7,11 +7,10 @@ const M_PER_MILE = 1609.344;
 const FT_PER_M = 3.28084;
 
 function defaultUnits(): Units {
-  // Roads in the UK and the US use miles.
-  return ['en-US', 'en-GB'].includes(navigator.language) ? 'imperial' : 'metric';
+  return 'metric';
 }
 
-let units: Units = (localStorage.getItem(STORAGE_KEY) as Units | null) ?? defaultUnits();
+let units: Units = localStorage.getItem(STORAGE_KEY) === 'imperial' ? 'imperial' : defaultUnits();
 const listeners: Array<() => void> = [];
 
 export function getUnits(): Units {

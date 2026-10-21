@@ -16,24 +16,6 @@ export interface ProfileMeta {
 }
 
 export const PROFILE_INFO: Record<ProfileName, ProfileMeta> = {
-  'fastbike-lowtraffic': {
-    id: 'fastbike-lowtraffic',
-    label: 'Fastbike Low Traffic',
-    shortLabel: 'Low Traffic',
-    summary: 'Paved roads, avoids heavy traffic, balanced climbing.',
-  },
-  'fastbike-verylowtraffic': {
-    id: 'fastbike-verylowtraffic',
-    label: 'Fastbike Very Low Traffic',
-    shortLabel: 'Very Low Traffic',
-    summary: 'Quiet country lanes and backroads, strong traffic avoidance.',
-  },
-  fastbike: {
-    id: 'fastbike',
-    label: 'Fastbike',
-    shortLabel: 'Fastbike',
-    summary: 'Direct paved road routing for speed, allows busier roads.',
-  },
   'gabis-safe-road': {
     id: 'gabis-safe-road',
     label: "Gabi's Safe Road",
@@ -52,27 +34,45 @@ export const PROFILE_INFO: Record<ProfileName, ProfileMeta> = {
     shortLabel: 'Lite Gravel',
     summary: 'Quiet lanes mixed with compact gravel tracks and towpaths.',
   },
+  'fastbike-lowtraffic': {
+    id: 'fastbike-lowtraffic',
+    label: 'BRouter Fastbike Low Traffic',
+    shortLabel: 'BRouter Low Traffic',
+    summary: 'Paved roads, avoids heavy traffic, balanced climbing.',
+  },
+  'fastbike-verylowtraffic': {
+    id: 'fastbike-verylowtraffic',
+    label: 'BRouter Fastbike Very Low Traffic',
+    shortLabel: 'BRouter Very Low Traffic',
+    summary: 'Quiet country lanes and backroads, strong traffic avoidance.',
+  },
+  fastbike: {
+    id: 'fastbike',
+    label: 'BRouter Fastbike',
+    shortLabel: 'BRouter Fastbike',
+    summary: 'Direct paved road routing for speed, allows busier roads.',
+  },
   gravel: {
     id: 'gravel',
-    label: 'Gravel',
-    shortLabel: 'Gravel',
+    label: 'BRouter Gravel',
+    shortLabel: 'BRouter Gravel',
     summary: 'Prefers unpaved tracks, bridleways, and off-road trails.',
   },
   trekking: {
     id: 'trekking',
-    label: 'Trekking',
-    shortLabel: 'Trekking',
+    label: 'BRouter Trekking',
+    shortLabel: 'BRouter Trekking',
     summary: 'Touring and utility cycling on cycle paths and gentle gradients.',
   },
 };
 
 export const PROFILE_ORDER: ProfileName[] = [
-  'fastbike-lowtraffic',
-  'fastbike-verylowtraffic',
   'gabis-safe-road',
   'gabis-fast-city',
-  'fastbike',
   'gabis-lite-gravel',
+  'fastbike-lowtraffic',
+  'fastbike-verylowtraffic',
+  'fastbike',
   'gravel',
   'trekking',
 ];

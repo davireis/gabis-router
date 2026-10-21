@@ -106,6 +106,15 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
   );
 
   const hasAnyRoute = parsedSlots.some((d) => d !== null);
+  const hadAnyRouteRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (hasAnyRoute && !hadAnyRouteRef.current) {
+      setCollapsedBySlot({ 0: false, 1: false, 2: false });
+    }
+    hadAnyRouteRef.current = hasAnyRoute;
+  }, [hasAnyRoute]);
+
   if (!hasAnyRoute) return null;
 
   const isMultiSlot = slots.length > 1;
