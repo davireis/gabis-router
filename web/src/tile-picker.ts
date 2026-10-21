@@ -100,10 +100,22 @@ export class TilePickerControl implements maplibregl.IControl {
   private renderMenu() {
     if (!this.menu) return;
     const current = getBasemap();
-    const options: { id: Basemap; label: string; desc: string }[] = [
-      { id: 'standard', label: 'Standard', desc: 'Vector map' },
-      { id: 'opencyclemap', label: 'OpenCycleMap', desc: 'NCN, RCN & LCN routes' },
-      { id: 'cyclosm', label: 'CyclOSM', desc: 'Bicycle infrastructure' },
+    const options: { id: Basemap; label: string; desc?: string; infoUrl?: string }[] = [
+      {
+        id: 'standard',
+        label: 'GBRouter / OSM Bright',
+        desc: 'Light tiles with cycle routes',
+      },
+      {
+        id: 'cyclosm',
+        label: 'CycloOSM',
+        desc: 'Official, free OSM cycling tiles',
+        infoUrl: 'http://www.cyclosm.org/',
+      },
+      {
+        id: 'opencyclemap',
+        label: 'OpenCycleMap [deprecated]',
+      },
     ];
 
     this.menu.innerHTML = `
@@ -111,7 +123,13 @@ export class TilePickerControl implements maplibregl.IControl {
       ${options
         .map((opt) => {
           const isActive = current === opt.id;
-          const isDisabled = this.isOffline && opt.id === 'cyclosm';
+          const isDisabled = this.isOffline && opt.id !== 'standard';
+          const infoLink = opt.infoUrl
+            ? ` <a href="${opt.infoUrl}" target="_blank" rel="noopener noreferrer" class="info-btn tile-opt-info-link" title="${opt.infoUrl}" aria-label="More info">i</a>`
+            : '';
+          const descHtml = opt.desc
+            ? `<span class="tile-opt-desc">${opt.desc}${infoLink}</span>`
+            : '';
           return `
             <button
               type="button"
@@ -123,7 +141,7 @@ export class TilePickerControl implements maplibregl.IControl {
             >
               <div class="tile-opt-info">
                 <span class="tile-opt-label">${opt.label}</span>
-                <span class="tile-opt-desc">${opt.desc}</span>
+                ${descHtml}
               </div>
               <svg class="tile-opt-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="${isActive ? '' : 'display:none;'}">
                 <polyline points="20 6 9 17 4 12"></polyline>
@@ -133,6 +151,12 @@ export class TilePickerControl implements maplibregl.IControl {
         })
         .join('')}
     `;
+
+    this.menu.querySelectorAll<HTMLAnchorElement>('.tile-opt-info-link').forEach((link) => {
+      link.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    });
 
     this.menu.querySelectorAll<HTMLButtonElement>('.tile-picker-opt').forEach((btn) => {
       btn.addEventListener('click', (e) => {

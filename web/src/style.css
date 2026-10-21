@@ -2443,7 +2443,7 @@ body,
   display: flex;
   flex-direction: column;
   gap: 3px;
-  min-width: 185px;
+  min-width: 225px;
   z-index: 100;
   backdrop-filter: blur(12px);
 }
@@ -2511,6 +2511,15 @@ body,
 .tile-opt-desc {
   font-size: 0.68rem;
   color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.tile-opt-info-link {
+  text-decoration: none;
+  margin-left: 2px;
 }
 
 .tile-opt-check {
