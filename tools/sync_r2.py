@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -213,12 +214,14 @@ def upload_large_files_via_worker(bucket: str, files_to_upload):
             f'bucket_name = "{bucket}"\n'
         )
         run(["npx", "wrangler", "deploy", "-c", str(wrangler_toml)])
+        time.sleep(6)
         try:
             for key, filepath, content_type in files_to_upload:
                 size_mb = filepath.stat().st_size / (1024 * 1024)
                 print(f"Multipart uploading {key} ({size_mb:.1f} MiB)...", flush=True)
                 create_cmd = [
-                    "curl", "-sf", "--resolve", f"{worker_host}:443:{edge_ip}",
+                    "curl", "-sf", "--retry", "8", "--retry-all-errors", "--retry-delay", "2",
+                    "--resolve", f"{worker_host}:443:{edge_ip}",
                     "-X", "POST",
                     f"{base_url}/?action=create&key={urllib.parse.quote(key)}&type={urllib.parse.quote(content_type)}",
                 ]
@@ -239,7 +242,8 @@ def upload_large_files_via_worker(bucket: str, files_to_upload):
                                 f"&uploadId={urllib.parse.quote(upload_id)}&partNumber={part_num}"
                             )
                             part_out = subprocess.check_output([
-                                "curl", "-sf", "--resolve", f"{worker_host}:443:{edge_ip}",
+                                "curl", "-sf", "--retry", "8", "--retry-all-errors", "--retry-delay", "2",
+                                "--resolve", f"{worker_host}:443:{edge_ip}",
                                 "-X", "PUT",
                                 "--data-binary", f"@{part_file}",
                                 "-H", "Content-Type: application/octet-stream",
@@ -255,7 +259,8 @@ def upload_large_files_via_worker(bucket: str, files_to_upload):
                     f"&uploadId={urllib.parse.quote(upload_id)}"
                 )
                 subprocess.check_output([
-                    "curl", "-sf", "--resolve", f"{worker_host}:443:{edge_ip}",
+                    "curl", "-sf", "--retry", "8", "--retry-all-errors", "--retry-delay", "2",
+                    "--resolve", f"{worker_host}:443:{edge_ip}",
                     "-X", "POST",
                     "-H", "Content-Type: application/json",
                     "-d", json.dumps(parts),
