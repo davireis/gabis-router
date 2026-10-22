@@ -55,9 +55,11 @@ test('formatPlaceProperties handles place without specific name', () => {
   assert.equal(result.name, 'Kew, London');
 });
 
-test('cachePlaceName populates reverseGeocode cache', async () => {
-  const { cachePlaceName, reverseGeocode } = await import('../src/geocoding.ts');
+test('cachePlaceName populates reverseGeocode cache and getCachedPlaceName', async () => {
+  const { cachePlaceName, getCachedPlaceName, reverseGeocode } = await import('../src/geocoding.ts');
+  assert.equal(getCachedPlaceName(51.5074, -0.1278), null);
   cachePlaceName(51.5074, -0.1278, 'Trafalgar Square, London');
+  assert.equal(getCachedPlaceName(51.5074, -0.1278), 'Trafalgar Square, London');
   const cached = await reverseGeocode(51.5074, -0.1278);
   assert.equal(cached, 'Trafalgar Square, London');
 });

@@ -35,8 +35,6 @@ enum CycleNetwork {
     Rcn = 2,
     Lcn = 3,
     Mtb = 4,
-    Cycleway = 5,
-    Cyclelane = 6,
 }
 
 impl CycleNetwork {
@@ -45,8 +43,6 @@ impl CycleNetwork {
             Self::Icn | Self::Ncn => 5,
             Self::Rcn => 7,
             Self::Lcn | Self::Mtb => 8,
-            Self::Cycleway => 10,
-            Self::Cyclelane => 11,
         }
     }
 }
@@ -265,33 +261,23 @@ fn encode_mvt_tile(
     write_varint(&mut layer, 2);
     // field 1: name = "cycle_routes"
     encode_string_field(&mut layer, 1, "cycle_routes");
-    // field 5: extent = 4096
+    // field 5: extent = EXTENT
     write_varint(&mut layer, ((5 << 3) | 0) as u64);
-    write_varint(&mut layer, 4096);
+    write_varint(&mut layer, EXTENT as u64);
 
     // Keys: 0 = "network", 1 = "state", 2 = "ref"
     encode_string_field(&mut layer, 3, "network");
     encode_string_field(&mut layer, 3, "state");
     encode_string_field(&mut layer, 3, "ref");
 
-    // Fixed values: 0="icn", 1="ncn", 2="rcn", 3="lcn", 4="mtb", 5="cycleway", 6="cyclelane", 7="actual", 8="proposed"
-    for v in [
-        "icn",
-        "ncn",
-        "rcn",
-        "lcn",
-        "mtb",
-        "cycleway",
-        "cyclelane",
-        "actual",
-        "proposed",
-    ] {
+    // Fixed values: 0="icn", 1="ncn", 2="rcn", 3="lcn", 4="mtb", 5="actual", 6="proposed"
+    for v in ["icn", "ncn", "rcn", "lcn", "mtb", "actual", "proposed"] {
         encode_mvt_value_string(&mut layer, v);
     }
 
-    // Dynamic ref values used in this tile (indices >= 9)
+    // Dynamic ref values used in this tile (indices >= 7)
     let mut ref_val_map: HashMap<u32, u64> = HashMap::new();
-    let mut next_val_idx = 9u64;
+    let mut next_val_idx = 7u64;
     for &(_, _, ref_idx) in groups.keys() {
         if ref_idx > 0 && !ref_val_map.contains_key(&ref_idx) {
             if let Some(s) = ref_strings.get((ref_idx - 1) as usize) {
@@ -347,9 +333,9 @@ fn encode_mvt_tile(
         // key 0 ("network") -> net as u64
         write_varint(&mut tags_buf, 0);
         write_varint(&mut tags_buf, net as u64);
-        // key 1 ("state") -> 7 ("actual") or 8 ("proposed")
+        // key 1 ("state") -> 5 ("actual") or 6 ("proposed")
         write_varint(&mut tags_buf, 1);
-        write_varint(&mut tags_buf, if proposed { 8 } else { 7 });
+        write_varint(&mut tags_buf, if proposed { 6 } else { 5 });
         // key 2 ("ref") -> dynamic ref value index (if present)
         if let Some(&v_idx) = ref_val_map.get(&ref_idx) {
             write_varint(&mut tags_buf, 2);
@@ -454,69 +440,10 @@ fn main() -> io::Result<()> {
     .iter()
     .filter_map(|k| way_lu.get_name_idx(k))
     .collect();
-    let mtb_idxs: Vec<usize> = ["route_bicycle_mtb"]
+    let mtb_idxs: Vec<usize> = ["route_bicycle_mtb", "route_mtb_mtb", "route_mtb_"]
         .iter()
         .filter_map(|k| way_lu.get_name_idx(k))
         .collect();
-
-    let match_vals = |key: &str, vals: &[&str]| -> Option<(usize, Vec<i32>)> {
-        let kidx = way_lu.get_name_idx(key)?;
-        let vidxs: Vec<i32> = vals
-            .iter()
-            .filter_map(|v| way_lu.get_value_idx(kidx, v))
-            .collect();
-        if vidxs.is_empty() {
-            None
-        } else {
-            Some((kidx, vidxs))
-        }
-    };
-
-    let hw_cycleway = match_vals("highway", &["cycleway"]);
-    let hw_path_like = match_vals("highway", &["path", "footway", "pedestrian", "bridleway"]);
-    let bic_designated = match_vals("bicycle", &["designated", "official"]);
-
-    let cw_track_rules: Vec<(usize, Vec<i32>)> = [
-        match_vals(
-            "cycleway",
-            &["track", "opposite_track", "segregated", "designated"],
-        ),
-        match_vals("cycleway:both", &["track", "separate"]),
-        match_vals("cycleway:right", &["track", "sidepath", "opposite_track"]),
-        match_vals("cycleway:left", &["track", "sidepath", "opposite_track"]),
-    ]
-    .into_iter()
-    .flatten()
-    .collect();
-
-    let cw_lane_rules: Vec<(usize, Vec<i32>)> = [
-        match_vals(
-            "cycleway",
-            &[
-                "lane",
-                "opposite_lane",
-                "shared_lane",
-                "share_busway",
-                "shared",
-                "opposite",
-            ],
-        ),
-        match_vals(
-            "cycleway:both",
-            &["lane", "shared_lane", "share_busway", "shared", "yes"],
-        ),
-        match_vals(
-            "cycleway:right",
-            &["lane", "share_busway", "shared_lane", "opposite_lane", "yes"],
-        ),
-        match_vals(
-            "cycleway:left",
-            &["lane", "share_busway", "shared_lane", "opposite_lane", "yes"],
-        ),
-    ]
-    .into_iter()
-    .flatten()
-    .collect();
 
     let mut tm = TileManager::with_cache_capacity(&segments_dir, 0);
     let mut ld = vec![0i32; way_lu.names.len()];
@@ -566,46 +493,21 @@ fn main() -> io::Result<()> {
                                 }
                             };
 
-                            let has_rule =
-                                |rule: &Option<(usize, Vec<i32>)>| -> bool {
-                                    if let Some((kidx, vidxs)) = rule {
-                                        vidxs.contains(&ld[*kidx])
-                                    } else {
-                                        false
-                                    }
-                                };
-
-                            let has_any_rule = |rules: &[(usize, Vec<i32>)]| -> bool {
-                                rules
-                                    .iter()
-                                    .any(|(kidx, vidxs)| vidxs.contains(&ld[*kidx]))
+                            let matched = if let Some(p) = check(&icn_idxs) {
+                                Some((CycleNetwork::Icn, p))
+                            } else if let Some(p) = check(&ncn_idxs) {
+                                Some((CycleNetwork::Ncn, p))
+                            } else if let Some(p) = check(&rcn_idxs) {
+                                Some((CycleNetwork::Rcn, p))
+                            } else if let Some(p) = check(&lcn_idxs) {
+                                Some((CycleNetwork::Lcn, p))
+                            } else {
+                                check(&mtb_idxs).map(|p| (CycleNetwork::Mtb, p))
                             };
 
-                            let mut matched = Vec::new();
-                            if let Some(p) = check(&icn_idxs) {
-                                matched.push((CycleNetwork::Icn, p));
-                            } else if let Some(p) = check(&ncn_idxs) {
-                                matched.push((CycleNetwork::Ncn, p));
-                            } else if let Some(p) = check(&rcn_idxs) {
-                                matched.push((CycleNetwork::Rcn, p));
-                            } else if let Some(p) = check(&lcn_idxs) {
-                                matched.push((CycleNetwork::Lcn, p));
-                            } else if let Some(p) = check(&mtb_idxs) {
-                                matched.push((CycleNetwork::Mtb, p));
-                            }
-
-                            let is_cycleway = has_rule(&hw_cycleway)
-                                || (has_rule(&hw_path_like) && has_rule(&bic_designated))
-                                || has_any_rule(&cw_track_rules);
-                            if is_cycleway {
-                                matched.push((CycleNetwork::Cycleway, false));
-                            } else if has_any_rule(&cw_lane_rules) {
-                                matched.push((CycleNetwork::Cyclelane, false));
-                            }
-
-                            if matched.is_empty() {
+                            let Some((network, proposed)) = matched else {
                                 continue;
-                            }
+                            };
 
                             let mut mercator_pts = Vec::with_capacity(link.geometry.len() + 2);
                             let (mut min_mx, mut max_mx) = (f64::INFINITY, f64::NEG_INFINITY);
@@ -647,30 +549,20 @@ fn main() -> io::Result<()> {
                             }
                             push_pt(link.target_lon, link.target_lat);
 
-                            for (network, proposed) in matched {
-                                let is_route = matches!(
-                                    network,
-                                    CycleNetwork::Icn
-                                        | CycleNetwork::Ncn
-                                        | CycleNetwork::Rcn
-                                        | CycleNetwork::Lcn
-                                        | CycleNetwork::Mtb
-                                );
-                                let ref_idx = if is_route { found_ref_idx } else { 0 };
-                                if ref_idx > 0 {
-                                    matched_ref_ways += 1;
-                                }
-                                ways.push(ExtractedWay {
-                                    network,
-                                    proposed,
-                                    ref_idx,
-                                    mercator_pts: mercator_pts.clone(),
-                                    min_mx,
-                                    max_mx,
-                                    min_my,
-                                    max_my,
-                                });
+                            let ref_idx = found_ref_idx;
+                            if ref_idx > 0 {
+                                matched_ref_ways += 1;
                             }
+                            ways.push(ExtractedWay {
+                                network,
+                                proposed,
+                                ref_idx,
+                                mercator_pts,
+                                min_mx,
+                                max_mx,
+                                min_my,
+                                max_my,
+                            });
                         }
                     }
                 }
@@ -678,10 +570,15 @@ fn main() -> io::Result<()> {
         }
     }
 
+    let mut counts: BTreeMap<CycleNetwork, usize> = BTreeMap::new();
+    for w in &ways {
+        *counts.entry(w.network).or_default() += 1;
+    }
     eprintln!(
-        "Extracted {} cycling route way segments ({} with ref labels).",
+        "Extracted {} cycling way segments ({} with ref labels): {:?}",
         ways.len(),
-        matched_ref_ways
+        matched_ref_ways,
+        counts
     );
 
     // Build tiles across zooms MIN_ZOOM..=MAX_ZOOM, keyed by Hilbert tile_id

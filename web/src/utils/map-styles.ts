@@ -471,147 +471,6 @@ function buildCycleRouteHighlightLayers(): any[] {
   ];
 }
 
-function buildCycleInfraLayers(): any[] {
-  return [
-    // Soft indigo backing under dashed cycle lanes so gaps between dashes are tinted, not white
-    {
-      id: 'ocm-rd5-cyclelane-bg',
-      type: 'line',
-      source: 'cycle_routes',
-      'source-layer': 'cycle_routes',
-      minzoom: 11,
-      filter: ['==', ['get', 'network'], 'cyclelane'],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': '#a5b4fc',
-        'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 11, 0.8, 13, 1.5, 15, 2.6, 18, 5.0],
-        'line-opacity': 1,
-      },
-    },
-    // On-road cycle lanes extracted from RD5
-    {
-      id: 'ocm-rd5-cyclelane',
-      type: 'line',
-      source: 'cycle_routes',
-      'source-layer': 'cycle_routes',
-      minzoom: 11,
-      filter: ['==', ['get', 'network'], 'cyclelane'],
-      layout: { 'line-cap': 'butt', 'line-join': 'round' },
-      paint: {
-        'line-color': ['interpolate', ['linear'], ['zoom'], 11, '#4f46e5', 15, '#6366f1'],
-        'line-dasharray': [6, 0.9],
-        'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 11, 0.6, 13, 1.3, 15, 2.4, 18, 4.8],
-        'line-opacity': 1,
-      },
-    },
-    // Dedicated cycleways & cycle tracks extracted from RD5 (zooms 10+)
-    {
-      id: 'ocm-rd5-cycleway-casing',
-      type: 'line',
-      source: 'cycle_routes',
-      'source-layer': 'cycle_routes',
-      minzoom: 12,
-      filter: ['==', ['get', 'network'], 'cycleway'],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': '#c7d2fe',
-        'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 12, 1.8, 14, 3.2, 16, 5.2, 18, 8.0],
-        'line-opacity': 1,
-      },
-    },
-    {
-      id: 'ocm-rd5-cycleway-line',
-      type: 'line',
-      source: 'cycle_routes',
-      'source-layer': 'cycle_routes',
-      minzoom: 10,
-      filter: ['==', ['get', 'network'], 'cycleway'],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': ['interpolate', ['linear'], ['zoom'], 10, '#4f46e5', 15, '#6366f1'],
-        'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 10, 0.5, 12, 1.1, 14, 2.0, 16, 3.4, 18, 5.5],
-        'line-opacity': 1,
-      },
-    },
-    // Dedicated cycleways & designated cycle paths from OpenMapTiles transportation layer
-    {
-      id: 'ocm-cycleway-casing',
-      type: 'line',
-      source: 'openmaptiles',
-      'source-layer': 'transportation',
-      minzoom: 12,
-      filter: [
-        'all',
-        ['==', ['get', 'class'], 'path'],
-        ['any', ['==', ['get', 'subclass'], 'cycleway'], ['==', ['get', 'bicycle'], 'designated']],
-      ],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': '#c7d2fe',
-        'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 12, 1.8, 14, 3.2, 16, 5.2, 18, 8.0],
-        'line-opacity': 1,
-      },
-    },
-    {
-      id: 'ocm-cycleway-line',
-      type: 'line',
-      source: 'openmaptiles',
-      'source-layer': 'transportation',
-      minzoom: 10,
-      filter: [
-        'all',
-        ['==', ['get', 'class'], 'path'],
-        ['any', ['==', ['get', 'subclass'], 'cycleway'], ['==', ['get', 'bicycle'], 'designated']],
-      ],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': ['interpolate', ['linear'], ['zoom'], 10, '#4f46e5', 15, '#6366f1'],
-        'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 10, 0.55, 12, 1.1, 14, 2.0, 16, 3.4, 18, 5.5],
-        'line-opacity': 1,
-      },
-    },
-    // Medium sage backing under dashed bridleways so gaps between dashes are green-tinted, not white
-    {
-      id: 'ocm-bridleway-bg',
-      type: 'line',
-      source: 'openmaptiles',
-      'source-layer': 'transportation',
-      minzoom: 10,
-      filter: [
-        'any',
-        ['==', ['get', 'subclass'], 'bridleway'],
-        ['all', ['==', ['get', 'class'], 'track'], ['!=', ['get', 'bicycle'], 'no']],
-      ],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': '#86efac',
-        'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 10, 0.75, 12, 1.1, 15, 2.0, 18, 4.0],
-        'line-opacity': 1,
-      },
-    },
-    // Bridleways & tracks where cycling is permitted
-    {
-      id: 'ocm-bridleway-line',
-      type: 'line',
-      source: 'openmaptiles',
-      'source-layer': 'transportation',
-      minzoom: 10,
-      filter: [
-        'any',
-        ['==', ['get', 'subclass'], 'bridleway'],
-        ['all', ['==', ['get', 'class'], 'track'], ['!=', ['get', 'bicycle'], 'no']],
-      ],
-      layout: { 'line-cap': 'butt', 'line-join': 'round' },
-      paint: {
-        'line-color': '#16a34a',
-        'line-dasharray': [5.5, 0.9],
-        'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 10, 0.6, 12, 0.9, 15, 1.8, 18, 3.8],
-        'line-opacity': 1,
-      },
-    },
-  ];
-}
-
 const CYCLE_SHIELD_COLORS: Record<string, string> = {
   'cycle-shield-ncn': '#e11d48',
   'cycle-shield-rcn': '#9333ea',
@@ -1160,11 +1019,60 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
       },
     },
     {
-      id: 'dense-poi-cycling',
+      id: 'dense-poi-cycling-outdoor',
       type: 'symbol',
       source: 'openmaptiles',
       'source-layer': 'poi',
-      minzoom: 14.5,
+      minzoom: 13,
+      filter: [
+        'all',
+        ['match', ['geometry-type'], ['MultiPoint', 'Point'], true, false],
+        [
+          'match',
+          ['get', 'class'],
+          [
+            'bicycle',
+            'bicycle_rental',
+            'drinking_water',
+            'toilets',
+            'shelter',
+            'campsite',
+            'castle',
+            'picnic_site',
+          ],
+          true,
+          false,
+        ],
+      ],
+      layout: {
+        'icon-image': ['get', 'class'],
+        'icon-size': 0.85,
+        'text-anchor': 'top',
+        'text-field': [
+          'step',
+          ['zoom'],
+          '',
+          14.5,
+          ['coalesce', ['get', 'name_en'], ['get', 'name']],
+        ],
+        'text-font': ['Noto Sans Italic'],
+        'text-max-width': 8,
+        'text-offset': [0, 0.65],
+        'text-size': 11,
+        'text-optional': true,
+      },
+      paint: {
+        'text-color': '#334155',
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 1.1,
+      },
+    },
+    {
+      id: 'dense-poi-food-stops',
+      type: 'symbol',
+      source: 'openmaptiles',
+      'source-layer': 'poi',
+      minzoom: 14,
       filter: [
         'all',
         ['match', ['geometry-type'], ['MultiPoint', 'Point'], true, false],
@@ -1173,24 +1081,17 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
           ['get', 'class'],
           [
             'cafe',
-            'beer',
-            'bar',
             'bakery',
-            'fast_food',
+            'bar',
+            'beer',
+            'grocery',
             'ice_cream',
-            'drinking_water',
-            'toilets',
-            'bicycle',
-            'bicycle_rental',
-            'shelter',
-            'campsite',
-            'picnic_site',
-            'castle',
+            'fuel',
+            'pharmacy',
+            'lodging',
+            'fast_food',
             'monument',
             'attraction',
-            'fuel',
-            'grocery',
-            'pharmacy',
             'hospital',
             'ferry',
           ],
@@ -1206,7 +1107,7 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
           'step',
           ['zoom'],
           '',
-          15.5,
+          15,
           ['coalesce', ['get', 'name_en'], ['get', 'name']],
         ],
         'text-font': ['Noto Sans Italic'],
@@ -1266,26 +1167,112 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
   return style;
 }
 
+const LIGHT_REMOVED_LAYER_IDS = new Set([
+  'poi_r1',
+  'poi_r7',
+  'poi_r20',
+  'landuse-commercial',
+  'landuse-industrial',
+  'landuse-cemetery',
+  'landuse-hospital',
+  'landuse-school',
+  'building-top',
+]);
+
+const EXCLUDED_POI_CLASSES = [
+  'bus',
+  'parking',
+  'parking_garage',
+  'hairdresser',
+  'clothing_store',
+  'bank',
+  'dentist',
+  'doctors',
+  'laundry',
+  'car',
+  'veterinary',
+  'florist',
+  'furniture',
+  'telephone',
+  'waste_basket',
+  // Already rendered earlier by dense-poi-cycling-outdoor & dense-poi-food-stops
+  'bicycle',
+  'bicycle_rental',
+  'drinking_water',
+  'toilets',
+  'shelter',
+  'campsite',
+  'castle',
+  'picnic_site',
+  'cafe',
+  'bakery',
+  'bar',
+  'beer',
+  'grocery',
+  'ice_cream',
+  'fuel',
+  'pharmacy',
+  'lodging',
+  'fast_food',
+  'monument',
+  'attraction',
+  'hospital',
+  'ferry',
+];
+
 export function getOpenCycleMapVectorStyle(isLight = true): maplibregl.StyleSpecification {
-  const baseLayers = structuredClone(OSM_BRIGHT_LAYERS);
+  const baseLayers = structuredClone(OSM_BRIGHT_LAYERS).filter(
+    (layer) => !isLight || !LIGHT_REMOVED_LAYER_IDS.has(layer.id),
+  );
 
   // Remove bus stops and car parking POIs from base layers, and show trails/paths when zoomed out
   for (const layer of baseLayers) {
     if (layer.id === 'poi_transit') {
-      layer.filter = ['match', ['get', 'class'], ['airport', 'rail', 'ferry'], true, false];
+      layer.filter = ['match', ['get', 'class'], ['airport', 'rail', 'railway', 'ferry'], true, false];
+      if (layer.layout) {
+        layer.layout['icon-image'] = [
+          'match',
+          ['get', 'class'],
+          'rail',
+          'railway',
+          ['to-string', ['get', 'class']],
+        ];
+      }
     } else if (
       (layer.id === 'poi_r1' || layer.id === 'poi_r7' || layer.id === 'poi_r20') &&
       Array.isArray(layer.filter)
     ) {
       layer.filter = [
         ...layer.filter,
-        ['!', ['match', ['get', 'class'], ['bus', 'parking', 'parking_garage'], true, false]],
+        ['!', ['match', ['get', 'class'], EXCLUDED_POI_CLASSES, true, false]],
       ];
       if (layer.id === 'poi_r1') layer.minzoom = 15;
       if (layer.id === 'poi_r7') layer.minzoom = 16;
       if (layer.id === 'poi_r20') layer.minzoom = 17;
+    } else if (
+      layer.id === 'highway-minor-casing' ||
+      layer.id === 'highway-minor' ||
+      layer.id === 'bridge-minor-casing' ||
+      layer.id === 'bridge-minor'
+    ) {
+      // Exclude unpaved farm/forest tracks ('track') from solid white paved road rendering
+      layer.filter = [
+        'all',
+        ['match', ['geometry-type'], ['LineString', 'MultiLineString'], true, false],
+        layer.id.startsWith('bridge-')
+          ? ['==', ['get', 'brunnel'], 'bridge']
+          : ['!=', ['get', 'brunnel'], 'tunnel'],
+        ['match', ['get', 'class'], ['minor', 'service'], true, false],
+      ];
     } else if (layer.id === 'highway-path' && layer.paint) {
       layer.minzoom = 10.5;
+      layer.filter = [
+        'all',
+        ['match', ['geometry-type'], ['LineString', 'MultiLineString'], true, false],
+        ['match', ['get', 'brunnel'], ['bridge', 'tunnel'], false, true],
+        ['==', ['get', 'class'], 'path'],
+        ['!=', ['get', 'subclass'], 'steps'],
+      ];
       layer.paint['line-color'] = isLight ? '#94a3b8' : '#64748b';
       layer.paint['line-opacity'] = isLight ? 0.55 : 0.9;
       layer.paint['line-dasharray'] = [4.5, 0.8];
@@ -1352,20 +1339,6 @@ export function getOpenCycleMapVectorStyle(isLight = true): maplibregl.StyleSpec
     baseLayers.splice(roadFillIdx, 0, ...routeLayers);
   } else {
     baseLayers.push(...routeLayers);
-  }
-
-  // Insert physical cycling infrastructure (cycleways, lanes, bridleways) above road fills but below labels
-  const labelIdx = baseLayers.findIndex((l) => l.id === 'waterway_line_label');
-  const infraLayers = buildCycleInfraLayers();
-  if (isLight) {
-    for (const layer of infraLayers) {
-      if (layer.paint) layer.paint['line-opacity'] = 0.58;
-    }
-  }
-  if (labelIdx >= 0) {
-    baseLayers.splice(labelIdx, 0, ...infraLayers);
-  } else {
-    baseLayers.push(...infraLayers);
   }
 
   // Insert cycle route ref labels alongside road labels

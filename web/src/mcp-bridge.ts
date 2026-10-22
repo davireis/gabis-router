@@ -799,6 +799,21 @@ async function handleMcpCommand(payload: {
 }
 
 if (import.meta.hot) {
+  if (typeof window !== 'undefined' && !(window as any).__rafPatchedForMcp) {
+    (window as any).__rafPatchedForMcp = true;
+    const origRaf = window.requestAnimationFrame.bind(window);
+    const origCaf = window.cancelAnimationFrame.bind(window);
+    window.requestAnimationFrame = (cb: FrameRequestCallback): number => {
+      if (document.hidden) {
+        return window.setTimeout(() => cb(performance.now()), 16) as unknown as number;
+      }
+      return origRaf(cb);
+    };
+    window.cancelAnimationFrame = (id: number): void => {
+      origCaf(id);
+      window.clearTimeout(id);
+    };
+  }
   import.meta.hot.accept();
   import.meta.hot.on('mcp:command', handleMcpCommand);
   import.meta.hot.dispose(() => {

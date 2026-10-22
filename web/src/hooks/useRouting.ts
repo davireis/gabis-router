@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
+  getSlotColor,
   MAX_ROUTE_SLOTS,
   PROFILE_INFO,
   PROFILE_ORDER,
+  ROUTE_COLOR_PALETTE,
   type AvoidArea,
   type LatLon,
   type ProfileName,
@@ -75,7 +77,12 @@ function parseHash(): { waypoints: LatLon[]; profiles?: ProfileName[]; avoidArea
   };
 }
 
-function loadSavedRoute(): { waypoints: LatLon[]; profiles?: ProfileName[]; avoidAreas?: AvoidArea[] } | null {
+function loadSavedRoute(): {
+  waypoints: LatLon[];
+  profiles?: ProfileName[];
+  colors?: string[];
+  avoidAreas?: AvoidArea[];
+} | null {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return null;
   try {
@@ -89,11 +96,15 @@ function loadSavedRoute(): { waypoints: LatLon[]; profiles?: ProfileName[]; avoi
       if (!profiles && validProfile(parsed.profile)) {
         profiles = [parsed.profile];
       }
+      const colors = Array.isArray(parsed.colors)
+        ? parsed.colors.filter((c: any) => typeof c === 'string')
+        : undefined;
       return {
         waypoints: Array.isArray(parsed.waypoints)
           ? parsed.waypoints.filter((w: any) => w && validPoint(Number(w.lat), Number(w.lon)))
           : [],
         profiles,
+        colors,
         avoidAreas: Array.isArray(parsed.avoidAreas)
           ? parsed.avoidAreas.filter((a: any) => a && validPoint(Number(a.lat), Number(a.lon)))
           : [],
@@ -156,6 +167,7 @@ export function useRouting(isOfflineMode: boolean) {
 
   const saveToUrlAndStorage = useCallback((wps: LatLon[], profs: ProfileName[], avoids: AvoidArea[]) => {
     const safeProfs: ProfileName[] = profs.length > 0 ? profs : [PROFILE_ORDER[0]];
+    const colors = slotsRef.current.map((s, idx) => getSlotColor(s, idx).id);
     try {
       localStorage.setItem(
         STORAGE_KEY,
@@ -163,6 +175,7 @@ export function useRouting(isOfflineMode: boolean) {
           waypoints: wps,
           profile: safeProfs[0],
           profiles: safeProfs,
+          colors,
           avoidAreas: avoids,
         }),
       );
@@ -416,11 +429,12 @@ export function useRouting(isOfflineMode: boolean) {
           ? saved.profiles
           : [PROFILE_ORDER[0]];
 
-      const initSlots: RouteSlotState[] = initProfs.map((p) => ({
+      const initSlots: RouteSlotState[] = initProfs.map((p, idx) => ({
         profile: p,
         alternativeIdx: 0,
         route: null,
         isRouting: false,
+        colorId: saved?.colors?.[idx] || ROUTE_COLOR_PALETTE[idx]?.id,
       }));
       activeSlotRouteIdRef.current = initSlots.map(() => null);
       requestedSlotAltRef.current = initSlots.map(() => 0);
@@ -595,6 +609,23 @@ export function useRouting(isOfflineMode: boolean) {
     [setSlotProfile],
   );
 
+  const setSlotColor = useCallback(
+    (slotIdx: number, colorId: string) => {
+      if (slotIdx < 0 || slotIdx >= slotsRef.current.length) return;
+      const nextSlots = slotsRef.current.map((s, idx) =>
+        idx === slotIdx ? { ...s, colorId } : s,
+      );
+      slotsRef.current = nextSlots;
+      setSlotsState(nextSlots);
+      saveToUrlAndStorage(
+        waypointsRef.current,
+        nextSlots.map((s) => s.profile),
+        avoidAreasRef.current,
+      );
+    },
+    [saveToUrlAndStorage],
+  );
+
   const addProfileSlot = useCallback(
     (initialProfile?: ProfileName) => {
       if (slotsRef.current.length >= MAX_ROUTE_SLOTS) return;
@@ -603,6 +634,10 @@ export function useRouting(isOfflineMode: boolean) {
         initialProfile && validProfile(initialProfile)
           ? initialProfile
           : PROFILE_ORDER.find((p) => !usedProfiles.has(p)) || PROFILE_ORDER[0];
+
+      const usedColors = new Set(slotsRef.current.map((s, idx) => getSlotColor(s, idx).id));
+      const nextColor =
+        ROUTE_COLOR_PALETTE.find((c) => !usedColors.has(c.id)) || ROUTE_COLOR_PALETTE[0];
 
       const newSlotIdx = slotsRef.current.length;
       const hasWps = waypointsRef.current.length >= 2;
@@ -613,6 +648,7 @@ export function useRouting(isOfflineMode: boolean) {
           alternativeIdx: 0,
           route: null,
           isRouting: hasWps,
+          colorId: nextColor.id,
         },
       ];
       activeSlotRouteIdRef.current.push(null);
@@ -976,6 +1012,7 @@ export function useRouting(isOfflineMode: boolean) {
     addProfileSlot,
     removeProfileSlot,
     setSlotProfile,
+    setSlotColor,
     selectSlotAlternative,
     profile: primarySlot.profile,
     setProfile,

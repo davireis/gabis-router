@@ -151,6 +151,11 @@ export function cachePlaceName(lat: number, lon: number, name: string): void {
   reverseCache.set(coordKey(lat, lon), name);
 }
 
+export function getCachedPlaceName(lat: number, lon: number): string | null {
+  const cached = reverseCache.get(coordKey(lat, lon));
+  return cached || null;
+}
+
 export async function searchPlaces(
   query: string,
   center?: { lat: number; lon: number },

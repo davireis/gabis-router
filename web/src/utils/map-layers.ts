@@ -1,7 +1,7 @@
 import type maplibregl from 'maplibre-gl';
 import {
+  getSlotColor,
   MAX_ROUTE_SLOTS,
-  ROUTE_SLOT_COLORS,
   type AvoidArea,
   type LatLon,
   type RouteSlotState,
@@ -91,7 +91,7 @@ export function syncRoutesLayers(map: maplibregl.Map, slots: RouteSlotState[]) {
     const haloId = slotIdx === 0 ? 'route-halo' : `route-${slotIdx}-halo`;
     const casingId = slotIdx === 0 ? 'route-casing' : `route-${slotIdx}-casing`;
     const lineId = slotIdx === 0 ? 'route-line' : `route-${slotIdx}-line`;
-    const color = ROUTE_SLOT_COLORS[slotIdx] || ROUTE_SLOT_COLORS[0];
+    const color = getSlotColor(slot, slotIdx);
 
     const source = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
     if (source) {

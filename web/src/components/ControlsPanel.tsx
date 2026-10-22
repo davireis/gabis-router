@@ -1,11 +1,12 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { useRouting } from '../hooks/useRouting.ts';
 import type { useOffline } from '../hooks/useOffline.ts';
 import {
+  getSlotColor,
   MAX_ROUTE_SLOTS,
   PROFILE_INFO,
   PROFILE_ORDER,
-  ROUTE_SLOT_COLORS,
+  ROUTE_COLOR_PALETTE,
   type LatLon,
   type ProfileName,
 } from '../types.ts';
@@ -45,6 +46,25 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
   const routeSectionRef = useRef<HTMLDivElement | null>(null);
   const importFileInputRef = useRef<HTMLInputElement | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [openColorSlotIdx, setOpenColorSlotIdx] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (openColorSlotIdx === null) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement)?.closest('.profile-color-picker-wrap')) {
+        setOpenColorSlotIdx(null);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenColorSlotIdx(null);
+    };
+    document.addEventListener('click', onDocClick);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('click', onDocClick);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [openColorSlotIdx]);
 
   const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -169,14 +189,48 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
 
           <div className="profile-slots-list">
             {routing.slots.map((slot, slotIdx) => {
-              const slotColor = ROUTE_SLOT_COLORS[slotIdx] || ROUTE_SLOT_COLORS[0];
+              const slotColor = getSlotColor(slot, slotIdx);
+              const isPickerOpen = openColorSlotIdx === slotIdx;
               return (
                 <div key={slotIdx} className="profile-slot-row">
-                  <span
-                    className="profile-slot-dot"
-                    style={{ backgroundColor: slotColor.line }}
-                    title={`Route ${slotIdx + 1} (${slotColor.name})`}
-                  />
+                  <div className="profile-color-picker-wrap">
+                    <button
+                      type="button"
+                      className={`profile-slot-dot profile-slot-dot-btn ${isPickerOpen ? 'active' : ''}`}
+                      style={{ backgroundColor: slotColor.line }}
+                      title={`Route ${slotIdx + 1} colour: ${slotColor.name} (click to change)`}
+                      aria-label={`Change route ${slotIdx + 1} colour (${slotColor.name})`}
+                      aria-expanded={isPickerOpen}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenColorSlotIdx(isPickerOpen ? null : slotIdx);
+                      }}
+                    />
+                    {isPickerOpen && (
+                      <div className="profile-color-popover" role="menu" aria-label="Select route colour">
+                        {ROUTE_COLOR_PALETTE.map((c) => {
+                          const isSelected = c.id === slotColor.id;
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              className={`profile-color-swatch ${isSelected ? 'selected' : ''}`}
+                              style={{ backgroundColor: c.line }}
+                              title={c.name}
+                              aria-label={c.name}
+                              aria-checked={isSelected}
+                              role="menuitemradio"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                routing.setSlotColor(slotIdx, c.id);
+                                setOpenColorSlotIdx(null);
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                   <select
                     id={slotIdx === 0 ? 'profile-select' : `profile-select-${slotIdx}`}
                     value={slot.profile}

@@ -322,7 +322,7 @@ fn snap_track_point_to_road(
             let edge_max_lon = s_pos.lon.max(edge.target_lon);
             let edge_min_lat = s_pos.lat.min(edge.target_lat);
             let edge_max_lat = s_pos.lat.max(edge.target_lat);
-            let margin = if edge.geometry.is_empty() { 0 } else { 10000 };
+            let margin = if edge.is_geometry_empty() { 0 } else { 10000 };
             if edge_max_lon + margin < min_lon
                 || edge_min_lon - margin > max_lon
                 || edge_max_lat + margin < min_lat
@@ -344,6 +344,7 @@ fn snap_track_point_to_road(
             };
 
             edge.fill_polyline(
+                graph,
                 &mut poly,
                 source_node.ilon,
                 source_node.ilat,

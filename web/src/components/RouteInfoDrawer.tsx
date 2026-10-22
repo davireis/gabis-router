@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
+  getSlotColor,
   PROFILE_INFO,
-  ROUTE_SLOT_COLORS,
   type RouteSlotState,
 } from '../types.ts';
 import type { SegmentHighlight, SegmentData } from '../utils/classification.ts';
@@ -140,7 +140,7 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
         const routeData = parsedSlots[slotIdx];
         if (!routeData && !slot.isRouting) return null;
 
-        const slotColor = ROUTE_SLOT_COLORS[slotIdx] || ROUTE_SLOT_COLORS[0];
+        const slotColor = getSlotColor(slot, slotIdx);
         const profileMeta = PROFILE_INFO[slot.profile];
         const barCollapsed = Boolean(collapsedBySlot[slotIdx]);
 

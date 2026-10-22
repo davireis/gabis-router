@@ -10,13 +10,31 @@ export interface MenuItem {
 }
 
 let menuEl: HTMLDivElement | null = null;
+let headerEl: HTMLDivElement | null = null;
+let menuPos = { x: 0, y: 0 };
+let menuSession = 0;
 let closedAt = 0;
+
+function positionMenu(el: HTMLDivElement, x: number, y: number) {
+  const margin = 10;
+  el.style.left = `${Math.max(margin, Math.min(x, window.innerWidth - el.offsetWidth - margin))}px`;
+  el.style.top = `${Math.max(margin, Math.min(y, window.innerHeight - el.offsetHeight - margin))}px`;
+}
 
 export function hideMenu() {
   if (!menuEl) return;
   menuEl.remove();
   menuEl = null;
+  headerEl = null;
+  menuSession++;
   closedAt = performance.now();
+}
+
+export function updateMenuHeader(headerText: string, expectedSession?: number) {
+  if (!menuEl || !headerEl) return;
+  if (expectedSession !== undefined && expectedSession !== menuSession) return;
+  headerEl.textContent = headerText;
+  positionMenu(menuEl, menuPos.x, menuPos.y);
 }
 
 /** True if a menu was open a moment ago. Lets the caller ignore the click that closed it. */
@@ -25,8 +43,10 @@ export function menuClosedWithin(ms: number): boolean {
 }
 
 /** Shows a menu at viewport position (x, y). It stays inside the window. */
-export function showMenu(items: MenuItem[], x: number, y: number, headerText?: string) {
+export function showMenu(items: MenuItem[], x: number, y: number, headerText?: string): number {
   hideMenu();
+  const session = ++menuSession;
+  menuPos = { x, y };
   const el = document.createElement('div');
   el.id = 'map-menu';
   el.setAttribute('role', 'menu');
@@ -36,6 +56,7 @@ export function showMenu(items: MenuItem[], x: number, y: number, headerText?: s
     hdr.className = 'map-menu-header';
     hdr.textContent = headerText;
     el.appendChild(hdr);
+    headerEl = hdr;
   }
 
   for (const item of items) {
@@ -69,11 +90,10 @@ export function showMenu(items: MenuItem[], x: number, y: number, headerText?: s
   }
   document.body.appendChild(el);
 
-  const margin = 10;
-  el.style.left = `${Math.max(margin, Math.min(x, window.innerWidth - el.offsetWidth - margin))}px`;
-  el.style.top = `${Math.max(margin, Math.min(y, window.innerHeight - el.offsetHeight - margin))}px`;
+  positionMenu(el, x, y);
   el.querySelector('button')?.focus();
   menuEl = el;
+  return session;
 }
 
 // Capture phase: the map stops some events before they bubble up to the document.

@@ -39,10 +39,10 @@ npm --prefix web run dev
 ### Run BRouter Server Demo and Parity Tools
 
 ```bash
-# Run drop-in BRouter HTTP server on port 17777
+# Run HTTP server (same API as BRouter) on port 17777
 cargo run --release --manifest-path subrepos/brouter-rs/Cargo.toml --example server
 
-# Run parity benchmark suite
+# Run parity checks
 cargo run --release --manifest-path subrepos/brouter-rs/Cargo.toml --example compare_routes
 
 # Generate interactive route comparison map (routes_comparison.html)

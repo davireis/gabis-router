@@ -11,6 +11,7 @@ import {
   isOnlineMode,
   searchPlaces,
   cachePlaceName,
+  getCachedPlaceName,
   type GeocodePlace,
 } from '../geocoding.ts';
 import { parseCoordinateInput } from '../utils/geo.ts';
@@ -293,11 +294,18 @@ export const WaypointList: React.FC<WaypointListProps> = ({
   const AUTO_GEOCODE_MAX_POINTS = 10;
 
   const geocodeWaypointAt = (i: number) => {
-    if (!isOnlineMode()) return;
     const w = waypoints[i];
     if (!w || w.name) return;
     const cKey = wpCoordKey(w);
     const key = `${i}:${cKey}`;
+    const cached = getCachedPlaceName(w.lat, w.lon);
+    if (cached) {
+      geocodedKeysRef.current.add(key);
+      attemptedCoordsRef.current.add(cKey);
+      onRename(i, cached, { lat: w.lat, lon: w.lon });
+      return;
+    }
+    if (!isOnlineMode()) return;
     geocodedKeysRef.current.add(key);
     attemptedCoordsRef.current.add(cKey);
     setPendingCoords((prev) => {

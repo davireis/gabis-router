@@ -27,7 +27,8 @@ import { legendControl } from '../legend-control.ts';
 import { loadedPMTiles, archivesReady } from '../hooks/useOffline.ts';
 import { CYCLE_ROUTES_ARCHIVE, MAP_TILES_CACHE_NAME, segmentsForTile } from '../segment-cache.ts';
 import { getMapTileDownloadUrl } from '../platform.ts';
-import { showMenu, hideMenu, menuClosedWithin, type MenuItem } from '../menu.ts';
+import { showMenu, hideMenu, menuClosedWithin, updateMenuHeader, type MenuItem } from '../menu.ts';
+import { getCachedPlaceName, reverseGeocode } from '../geocoding.ts';
 import { distanceMeters, legIndexAt, nearestVertex } from '../utils/geo.ts';
 import {
   syncAvoidAreasLayer,
@@ -36,17 +37,29 @@ import {
   fitRouteBounds,
 } from '../utils/map-layers.ts';
 
+const remotePMTiles = new Map<string, pmtiles.PMTiles>();
+let devCycleCacheBust = Date.now();
+let protocolsRegistered = false;
+
 // Register PMTiles protocols
 function registerProtocols() {
+  remotePMTiles.clear();
+  devCycleCacheBust = Date.now();
+  if (protocolsRegistered) return;
+  protocolsRegistered = true;
   const protocol = new pmtiles.Protocol();
   maplibregl.addProtocol('pmtiles', protocol.tile);
-  getDemSource().setupMaplibre(maplibregl as any);
+  getDemSource();
 
-  const remotePMTiles = new Map<string, pmtiles.PMTiles>();
   const getRemoteArchive = (segmentId: string): pmtiles.PMTiles => {
     let archive = remotePMTiles.get(segmentId);
     if (!archive) {
-      archive = new pmtiles.PMTiles(getMapTileDownloadUrl(segmentId));
+      const baseUrl = getMapTileDownloadUrl(segmentId);
+      const url =
+        import.meta.env.DEV && segmentId === CYCLE_ROUTES_ARCHIVE
+          ? `${baseUrl}?v=${devCycleCacheBust}`
+          : baseUrl;
+      archive = new pmtiles.PMTiles(url);
       remotePMTiles.set(segmentId, archive);
     }
     return archive;
@@ -399,26 +412,30 @@ export const MapView: React.FC<MapViewProps> = ({
     const showMapContextMenu = (p: LatLon, x: number, y: number) => {
       lastOpenedMarkerIndexRef.current = null;
       const wps = waypointsRef.current;
+      let resolvedName = getCachedPlaceName(p.lat, p.lon);
       const coordHeader = `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
+      const pointWithCachedName = (): LatLon => (resolvedName ? { ...p, name: resolvedName } : p);
+
       const items: MenuItem[] = [
         {
           label: 'Add point',
           hint: wps.length === 0 ? 'Start' : wps.length === 1 ? 'End' : 'Along route',
-          onSelect: () => onAddWaypointRef.current(p, wps.length >= 2 ? 'via' : 'append'),
+          onSelect: () =>
+            onAddWaypointRef.current(pointWithCachedName(), wps.length >= 2 ? 'via' : 'append'),
         },
         {
           label: 'Start here',
           hint: 'A',
-          onSelect: () => onAddWaypointRef.current(p, 'start'),
+          onSelect: () => onAddWaypointRef.current(pointWithCachedName(), 'start'),
         },
         {
           label: 'Via here',
-          onSelect: () => onAddWaypointRef.current(p, 'via'),
+          onSelect: () => onAddWaypointRef.current(pointWithCachedName(), 'via'),
         },
         {
           label: 'End here',
           hint: 'B',
-          onSelect: () => onAddWaypointRef.current(p, 'end'),
+          onSelect: () => onAddWaypointRef.current(pointWithCachedName(), 'end'),
         },
       ];
 
@@ -426,7 +443,7 @@ export const MapView: React.FC<MapViewProps> = ({
         items.push({
           label: 'Extend destination',
           hint: '+B',
-          onSelect: () => onAddWaypointRef.current(p, 'append'),
+          onSelect: () => onAddWaypointRef.current(pointWithCachedName(), 'append'),
         });
       }
 
@@ -448,7 +465,16 @@ export const MapView: React.FC<MapViewProps> = ({
         },
       );
 
-      showMenu(items, x, y, coordHeader);
+      const session = showMenu(items, x, y, resolvedName || coordHeader);
+
+      if (!resolvedName) {
+        reverseGeocode(p.lat, p.lon).then((name) => {
+          if (name) {
+            resolvedName = name;
+            updateMenuHeader(name, session);
+          }
+        });
+      }
     };
 
     const showAvoidContextMenu = (index: number, x: number, y: number) => {
@@ -762,10 +788,12 @@ export const MapView: React.FC<MapViewProps> = ({
     registerProtocols();
     map.setMaxBounds(isOfflineMode ? UK_BOUNDS : null);
     tilePickerControl.setOffline(isOfflineMode);
+    legendControl.syncBasemap(basemap);
     map.setStyle(
       isOfflineMode ? getOfflineStyle(basemap) : getOnlineStyle(basemap, thunderforestKey),
       { diff: false },
     );
+    (map as any)._renderTaskQueue?.run?.();
   }, [isOfflineMode, basemap, thunderforestKey]);
 
   // Waypoint markers synchronization (reuses existing Marker instances so active drags are never interrupted)

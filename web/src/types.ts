@@ -92,17 +92,44 @@ export interface AvoidArea {
 
 export const MAX_ROUTE_SLOTS = 3;
 
-export const ROUTE_SLOT_COLORS = [
-  { line: '#2563eb', casing: '#1e3a8a', soft: 'rgba(37, 99, 235, 0.14)', name: 'Blue' },
-  { line: '#db2777', casing: '#831843', soft: 'rgba(219, 39, 119, 0.14)', name: 'Magenta' },
-  { line: '#ea580c', casing: '#7c2d12', soft: 'rgba(234, 88, 12, 0.14)', name: 'Orange' },
+export interface RouteSlotColor {
+  id: string;
+  line: string;
+  casing: string;
+  soft: string;
+  name: string;
+}
+
+export const ROUTE_COLOR_PALETTE: readonly RouteSlotColor[] = [
+  { id: 'blue', line: '#2563eb', casing: '#1e3a8a', soft: 'rgba(37, 99, 235, 0.14)', name: 'Blue' },
+  { id: 'magenta', line: '#db2777', casing: '#831843', soft: 'rgba(219, 39, 119, 0.14)', name: 'Magenta' },
+  { id: 'orange', line: '#ea580c', casing: '#7c2d12', soft: 'rgba(234, 88, 12, 0.14)', name: 'Orange' },
+  { id: 'red', line: '#dc2626', casing: '#7f1d1d', soft: 'rgba(220, 38, 38, 0.14)', name: 'Red' },
+  { id: 'emerald', line: '#059669', casing: '#064e3b', soft: 'rgba(5, 150, 105, 0.14)', name: 'Emerald' },
+  { id: 'cyan', line: '#0891b2', casing: '#164e63', soft: 'rgba(8, 145, 178, 0.14)', name: 'Cyan' },
+  { id: 'violet', line: '#7c3aed', casing: '#4c1d95', soft: 'rgba(124, 58, 237, 0.14)', name: 'Violet' },
+  { id: 'slate', line: '#1e293b', casing: '#0f172a', soft: 'rgba(30, 41, 59, 0.14)', name: 'Charcoal' },
 ] as const;
+
+export const ROUTE_SLOT_COLORS = ROUTE_COLOR_PALETTE.slice(0, MAX_ROUTE_SLOTS);
 
 export interface RouteSlotState {
   profile: ProfileName;
   alternativeIdx: number;
   route: GeoJSON.FeatureCollection | null;
   isRouting: boolean;
+  colorId?: string;
+}
+
+export function getSlotColor(
+  slot: Pick<RouteSlotState, 'colorId'> | undefined,
+  slotIdx: number,
+): RouteSlotColor {
+  if (slot?.colorId) {
+    const found = ROUTE_COLOR_PALETTE.find((c) => c.id === slot.colorId);
+    if (found) return found;
+  }
+  return ROUTE_SLOT_COLORS[slotIdx] || ROUTE_SLOT_COLORS[0];
 }
 
 export interface RouteRequest {

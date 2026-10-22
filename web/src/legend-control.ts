@@ -94,7 +94,12 @@ export class LegendControl implements maplibregl.IControl {
     this.button.classList.remove('active');
   }
 
-  private syncBasemap(basemap: Basemap) {
+  syncBasemap(basemap: Basemap) {
+    if (!this.container && typeof document !== 'undefined') {
+      this.container = (document.querySelector('.legend-ctrl') as HTMLElement) || undefined;
+      this.panel =
+        (this.container?.querySelector('.map-legend-panel') as HTMLElement) || undefined;
+    }
     if (!this.container) return;
     const isGbRouter = basemap === 'standard' || basemap === 'dense';
     if (!isGbRouter) {
@@ -160,48 +165,18 @@ export class LegendControl implements maplibregl.IControl {
         </div>
       </div>
       <div class="map-legend-section">
-        <div class="map-legend-section-title">Paths &amp; Lanes</div>
-        <div class="map-legend-row">
-          <span class="map-legend-swatch">
-            <svg width="34" height="12" viewBox="0 0 34 12">
-              <line x1="2" y1="6" x2="32" y2="6" stroke="#c7d2fe" stroke-width="5" stroke-linecap="round" />
-              <line x1="2" y1="6" x2="32" y2="6" stroke="#4f46e5" stroke-width="2.6" stroke-linecap="round" />
-            </svg>
-          </span>
-          <span class="map-legend-label">Dedicated Cycleway</span>
-        </div>
-        <div class="map-legend-row">
-          <span class="map-legend-swatch">
-            <svg width="34" height="12" viewBox="0 0 34 12">
-              <line x1="2" y1="6" x2="32" y2="6" stroke="#a5b4fc" stroke-width="3.2" stroke-linecap="round" />
-              <line x1="2" y1="6" x2="32" y2="6" stroke="#4f46e5" stroke-width="2.4" stroke-dasharray="9 2" />
-            </svg>
-          </span>
-          <span class="map-legend-label">On-road Cycle Lane</span>
-        </div>
-        <div class="map-legend-row">
-          <span class="map-legend-swatch">
-            <svg width="34" height="12" viewBox="0 0 34 12">
-              <line x1="2" y1="6" x2="32" y2="6" stroke="#86efac" stroke-width="3.2" stroke-linecap="round" />
-              <line x1="2" y1="6" x2="32" y2="6" stroke="#16a34a" stroke-width="2.2" stroke-dasharray="9 2" />
-            </svg>
-          </span>
-          <span class="map-legend-label">Bridleway / Bike Track</span>
-        </div>
+        <div class="map-legend-section-title">Paths &amp; Terrain</div>
         <div class="map-legend-row">
           <span class="map-legend-swatch">
             <svg width="34" height="12" viewBox="0 0 34 12">
               <line x1="2" y1="6" x2="32" y2="6" stroke="#64748b" stroke-width="2" stroke-dasharray="7 2" />
             </svg>
           </span>
-          <span class="map-legend-label">Footpath / Trail</span>
+          <span class="map-legend-label">Path / Trail</span>
         </div>
-      </div>
-      ${
-        isDense
-          ? `
-      <div class="map-legend-section">
-        <div class="map-legend-section-title">Terrain &amp; Surface</div>
+        ${
+          isDense
+            ? `
         <div class="map-legend-row">
           <span class="map-legend-swatch">
             <svg width="34" height="12" viewBox="0 0 34 12">
@@ -209,7 +184,7 @@ export class LegendControl implements maplibregl.IControl {
               <line x1="2" y1="6" x2="32" y2="6" stroke="#92400e" stroke-width="2.2" stroke-dasharray="9 2" />
             </svg>
           </span>
-          <span class="map-legend-label">Farm / Forest Track</span>
+          <span class="map-legend-label">Track (Unpaved / Farm / Forest)</span>
         </div>
         <div class="map-legend-row">
           <span class="map-legend-swatch">
@@ -228,10 +203,10 @@ export class LegendControl implements maplibregl.IControl {
             </svg>
           </span>
           <span class="map-legend-label">Steps / Ford</span>
-        </div>
-      </div>`
-          : ''
-      }
+        </div>`
+            : ''
+        }
+      </div>
     `;
 
     this.panel.querySelector('.map-legend-close')?.addEventListener('click', (e) => {
