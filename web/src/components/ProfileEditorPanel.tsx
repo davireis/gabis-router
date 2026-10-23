@@ -178,6 +178,9 @@ function slugifyProfileId(name: string): string {
 
 export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing, onClose }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [defaultOpenDesktop] = useState<boolean>(
+    () => typeof window === 'undefined' || window.innerWidth > 860,
+  );
 
   const initialCustom = routing.customProfiles.find((c) => c.id === routing.profile);
   const initialTemplate: BaseTemplateId =
@@ -403,11 +406,12 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
           <button
             id="btn-close-profile-editor"
             type="button"
-            className="collapse-btn"
+            className="collapse-btn pe-close-btn"
             title="Close Profile Editor"
             aria-label="Close Profile Editor"
             onClick={onClose}
           >
+            <span className="pe-close-label">Done</span>
             <Icon name="close" size={15} />
           </button>
         </div>
@@ -587,7 +591,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
           </details>
 
           {/* Section 2: OSM Way Types (highway=*, aligned with Route Summary Road Type classes) */}
-          <details className="pe-section" open>
+          <details className="pe-section" open={defaultOpenDesktop}>
             <summary className="pe-section-summary">
               <span>2. Road Type (highway=*)</span>
               <span className="pe-section-badge pe-badge-a">+0–20</span>
@@ -837,7 +841,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
           </details>
 
           {/* Section 3: OSM Surface Penalties (surface=*, aligned with Route Summary Surface classes & subclasses) */}
-          <details className={`pe-section ${!axes.enableSurfacePenalties ? 'pe-section-disabled' : ''}`} open>
+          <details className={`pe-section ${!axes.enableSurfacePenalties ? 'pe-section-disabled' : ''}`} open={defaultOpenDesktop}>
             <summary className="pe-section-summary">
               <span>3. Surface Penalties (surface=*)</span>
               <div className="pe-section-summary-right">
