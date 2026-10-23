@@ -1,4 +1,4 @@
-import type { RouteResponse, WorkerMessage, LatLon } from './types.ts';
+import type { RouteResponse, WorkerMessage, LatLon, PointWayInfo } from './types.ts';
 import init, { WasmRouter } from './pkg/rsrouter_wasm.js';
 import { SEGMENT_CACHE_NAME, MIN_RD5_BYTES, fetchAndCacheSegment, isHtml } from './segment-cache.ts';
 
@@ -12,6 +12,8 @@ let router: WasmRouter | null = null;
 let isOfflineMode = false;
 const latestSlotRouteIds = new Map<number, string>();
 let latestImportId: string | null = null;
+let latestInspectId: string | null = null;
+const customProfileContents = new Map<string, string>();
 
 // Disk-backed Blob handles for 5°×5° .rd5 files (0 bytes of JS heap per file until a slice is read).
 const segmentBlobs = new Map<string, Blob>();
@@ -174,6 +176,14 @@ async function ensureRouter(): Promise<WasmRouter> {
     r.load_profile(p, await fetchText(`/profiles/${p}.brf`));
   }
 
+  for (const [name, content] of customProfileContents.entries()) {
+    try {
+      r.load_profile(name, content);
+    } catch {
+      // ignore invalid custom profile during fresh re-init
+    }
+  }
+
   router = r;
   return r;
 }
@@ -299,6 +309,29 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
       break;
     }
 
+    case 'LOAD_CUSTOM_PROFILE': {
+      try {
+        const r = await ensureRouter();
+        r.load_profile(msg.name, msg.content);
+        customProfileContents.set(msg.name, msg.content);
+        postMessage({
+          type: 'CUSTOM_PROFILE_LOADED',
+          id: msg.id,
+          name: msg.name,
+          ok: true,
+        } satisfies WorkerMessage);
+      } catch (err) {
+        postMessage({
+          type: 'CUSTOM_PROFILE_LOADED',
+          id: msg.id,
+          name: msg.name,
+          ok: false,
+          error: String(err),
+        } satisfies WorkerMessage);
+      }
+      break;
+    }
+
     case 'ROUTE_REQUEST': {
       const slotIdx = msg.slotIdx ?? 0;
       if (latestSlotRouteIds.get(slotIdx) !== msg.id) return;
@@ -370,6 +403,38 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
       break;
     }
 
+    case 'INSPECT_POINT_REQUEST': {
+      if (msg.id !== latestInspectId) return;
+      try {
+        const seg = segmentName(msg.lon, msg.lat);
+        const hasSeg = await openSegmentBlob(seg, false);
+        if (!hasSeg || msg.id !== latestInspectId) {
+          postMessage({
+            type: 'INSPECT_POINT_SUCCESS',
+            id: msg.id,
+            payload: null,
+          } satisfies WorkerMessage);
+          break;
+        }
+        const r = await ensureRouter();
+        if (msg.id !== latestInspectId) return;
+        const rawJson = r.inspect_point(msg.lon, msg.lat, msg.maxDistanceM ?? 45.0);
+        const parsed = JSON.parse(rawJson) as PointWayInfo | null;
+        postMessage({
+          type: 'INSPECT_POINT_SUCCESS',
+          id: msg.id,
+          payload: parsed,
+        } satisfies WorkerMessage);
+      } catch {
+        postMessage({
+          type: 'INSPECT_POINT_SUCCESS',
+          id: msg.id,
+          payload: null,
+        } satisfies WorkerMessage);
+      }
+      break;
+    }
+
     case 'CLEAR_GRAPH': {
       try {
         router?.clear_graph();
@@ -399,6 +464,8 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
   } else if (msg.type === 'IMPORT_GPX_REQUEST') {
     latestImportId = msg.id;
     latestSlotRouteIds.clear();
+  } else if (msg.type === 'INSPECT_POINT_REQUEST') {
+    latestInspectId = msg.id;
   }
   queue = queue
     .then(() => handleMessage(msg))

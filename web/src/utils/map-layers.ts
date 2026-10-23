@@ -162,6 +162,7 @@ function getFirstLabelLayerId(map: maplibregl.Map): string | undefined {
     'highway-name-path',
     'highway-name-minor',
     'highway-name-major',
+    'ocm-route-label-proposed',
     'ocm-route-label-mtb',
   ];
   for (const id of preferred) {

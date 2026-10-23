@@ -26,6 +26,32 @@ export class WasmRouter {
         return ret >>> 0;
     }
     /**
+     * Inspects the nearest road or path edge within `max_distance_m` of `(lon, lat)`
+     * and returns a JSON string of [`PointWayInfo`] (or `"null"` if no way is within range).
+     * @param {number} lon
+     * @param {number} lat
+     * @param {number} max_distance_m
+     * @returns {string}
+     */
+    inspect_point(lon, lat, max_distance_m) {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.wasmrouter_inspect_point(this.__wbg_ptr, lon, lat, max_distance_m);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
      * Loads the lookups.dat dictionary from a string.
      * @param {string} text
      */

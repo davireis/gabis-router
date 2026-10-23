@@ -1,4 +1,4 @@
-export type ProfileName =
+export type BuiltinProfileName =
   | 'fastbike'
   | 'fastbike-lowtraffic'
   | 'fastbike-verylowtraffic'
@@ -8,14 +8,17 @@ export type ProfileName =
   | 'gravel'
   | 'trekking';
 
+export type ProfileName = BuiltinProfileName | (string & {});
+
 export interface ProfileMeta {
   id: ProfileName;
   label: string;
   shortLabel: string;
   summary: string;
+  isCustom?: boolean;
 }
 
-export const PROFILE_INFO: Record<ProfileName, ProfileMeta> = {
+export const PROFILE_INFO: Record<string, ProfileMeta> = {
   'gabis-safe-road': {
     id: 'gabis-safe-road',
     label: "Gabi's Safe Road",
@@ -66,7 +69,7 @@ export const PROFILE_INFO: Record<ProfileName, ProfileMeta> = {
   },
 };
 
-export const PROFILE_ORDER: ProfileName[] = [
+export const PROFILE_ORDER: BuiltinProfileName[] = [
   'gabis-safe-road',
   'gabis-fast-city',
   'gabis-lite-gravel',
@@ -168,12 +171,25 @@ export interface ImportGpxResponse {
   route: RouteResponse;
 }
 
+export interface PointWayInfo {
+  distance_m: number;
+  highway: string;
+  surface: string;
+  noise_class: number;
+  traffic_class: number;
+  maxspeed: number;
+}
+
 export type WorkerMessage =
   | { type: 'INIT' }
+  | { type: 'LOAD_CUSTOM_PROFILE'; id?: string; name: string; content: string }
+  | { type: 'CUSTOM_PROFILE_LOADED'; id?: string; name: string; ok: boolean; error?: string }
   | { type: 'ROUTE_REQUEST'; id: string; slotIdx?: number; payload: RouteRequest }
   | { type: 'ROUTE_SUCCESS'; id: string; slotIdx?: number; payload: RouteResponse }
   | { type: 'IMPORT_GPX_REQUEST'; id: string; payload: ImportGpxRequest }
   | { type: 'IMPORT_GPX_SUCCESS'; id: string; payload: ImportGpxResponse }
+  | { type: 'INSPECT_POINT_REQUEST'; id: string; lon: number; lat: number; maxDistanceM?: number }
+  | { type: 'INSPECT_POINT_SUCCESS'; id: string; payload: PointWayInfo | null }
   | { type: 'ROUTE_ERROR'; id: string; slotIdx?: number; error: string }
   | { type: 'STATUS'; message: string }
   | { type: 'CLEAR_GRAPH' }

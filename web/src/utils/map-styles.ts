@@ -154,7 +154,7 @@ function buildCycleRouteHighlightLayers(): any[] {
       },
     },
     {
-      id: 'ocm-route-lcn-proposed-bg',
+      id: 'ocm-route-lcn-proposed',
       type: 'line',
       source: 'cycle_routes',
       'source-layer': 'cycle_routes',
@@ -162,40 +162,19 @@ function buildCycleRouteHighlightLayers(): any[] {
       filter: ['all', ['==', ['get', 'network'], 'lcn'], ['==', ['get', 'state'], 'proposed']],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': '#ccfbf1',
-        'line-width': [
+        'line-color': [
           'interpolate',
-          ['exponential', 1.45],
+          ['linear'],
           ['zoom'],
           9,
-          1.5,
+          '#16a34a',
           12,
-          4.0,
-          13,
-          6.2,
+          '#22c55e',
           14,
-          9.6,
-          15,
-          14.0,
+          '#4ade80',
           16,
-          19.5,
-          18,
-          30.0,
+          '#86efac',
         ],
-        'line-opacity': 1,
-      },
-    },
-    {
-      id: 'ocm-route-lcn-proposed',
-      type: 'line',
-      source: 'cycle_routes',
-      'source-layer': 'cycle_routes',
-      minzoom: 9,
-      filter: ['all', ['==', ['get', 'network'], 'lcn'], ['==', ['get', 'state'], 'proposed']],
-      layout: { 'line-cap': 'butt', 'line-join': 'round' },
-      paint: {
-        'line-color': ['interpolate', ['linear'], ['zoom'], 9, '#0d9488', 12, '#14b8a6', 14, '#5eead4', 16, '#99f6e4'],
-        'line-dasharray': [5, 1.2],
         'line-width': [
           'interpolate',
           ['exponential', 1.45],
@@ -268,7 +247,7 @@ function buildCycleRouteHighlightLayers(): any[] {
       },
     },
     {
-      id: 'ocm-route-rcn-proposed-bg',
+      id: 'ocm-route-rcn-proposed',
       type: 'line',
       source: 'cycle_routes',
       'source-layer': 'cycle_routes',
@@ -276,42 +255,19 @@ function buildCycleRouteHighlightLayers(): any[] {
       filter: ['all', ['==', ['get', 'network'], 'rcn'], ['==', ['get', 'state'], 'proposed']],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': '#f3e8ff',
-        'line-width': [
+        'line-color': [
           'interpolate',
-          ['exponential', 1.45],
+          ['linear'],
           ['zoom'],
           8,
-          1.3,
-          10,
-          2.2,
+          '#16a34a',
           12,
-          4.2,
-          13,
-          6.5,
+          '#22c55e',
           14,
-          10.0,
-          15,
-          14.5,
+          '#4ade80',
           16,
-          20.5,
-          18,
-          31.0,
+          '#86efac',
         ],
-        'line-opacity': 1,
-      },
-    },
-    {
-      id: 'ocm-route-rcn-proposed',
-      type: 'line',
-      source: 'cycle_routes',
-      'source-layer': 'cycle_routes',
-      minzoom: 8,
-      filter: ['all', ['==', ['get', 'network'], 'rcn'], ['==', ['get', 'state'], 'proposed']],
-      layout: { 'line-cap': 'butt', 'line-join': 'round' },
-      paint: {
-        'line-color': ['interpolate', ['linear'], ['zoom'], 8, '#a855f7', 12, '#c084fc', 14, '#d8b4fe', 16, '#e9d5ff'],
-        'line-dasharray': [5, 1.2],
         'line-width': [
           'interpolate',
           ['exponential', 1.45],
@@ -392,7 +348,7 @@ function buildCycleRouteHighlightLayers(): any[] {
       },
     },
     {
-      id: 'ocm-route-ncn-proposed-bg',
+      id: 'ocm-route-ncn-proposed',
       type: 'line',
       source: 'cycle_routes',
       'source-layer': 'cycle_routes',
@@ -404,46 +360,19 @@ function buildCycleRouteHighlightLayers(): any[] {
       ],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': '#ffe4e6',
-        'line-width': [
+        'line-color': [
           'interpolate',
-          ['exponential', 1.45],
+          ['linear'],
           ['zoom'],
           7,
-          1.2,
-          9,
-          2.0,
+          '#16a34a',
           12,
-          4.5,
-          13,
-          6.8,
+          '#22c55e',
           14,
-          10.5,
-          15,
-          15.0,
+          '#4ade80',
           16,
-          21.0,
-          18,
-          32.0,
+          '#86efac',
         ],
-        'line-opacity': 1,
-      },
-    },
-    {
-      id: 'ocm-route-ncn-proposed',
-      type: 'line',
-      source: 'cycle_routes',
-      'source-layer': 'cycle_routes',
-      minzoom: 7,
-      filter: [
-        'all',
-        ['match', ['get', 'network'], ['ncn', 'icn'], true, false],
-        ['==', ['get', 'state'], 'proposed'],
-      ],
-      layout: { 'line-cap': 'butt', 'line-join': 'round' },
-      paint: {
-        'line-color': ['interpolate', ['linear'], ['zoom'], 7, '#f43f5e', 12, '#fb7185', 14, '#fda4af', 16, '#fecdd3'],
-        'line-dasharray': [5, 1.2],
         'line-width': [
           'interpolate',
           ['exponential', 1.45],
@@ -476,6 +405,7 @@ const CYCLE_SHIELD_COLORS: Record<string, string> = {
   'cycle-shield-rcn': '#9333ea',
   'cycle-shield-lcn': '#0d9488',
   'cycle-shield-mtb': '#ca8a04',
+  'cycle-shield-proposed': '#15803d',
 };
 
 function createShieldImageData(hexColor: string): {
@@ -524,6 +454,136 @@ export function registerCycleShieldImages(map: maplibregl.Map): void {
       content: [3, 2, 15, 12],
     });
   }
+
+  for (const [id, img] of Object.entries(createSceneryPatternImages())) {
+    if (map.hasImage(id)) {
+      map.removeImage(id);
+    }
+    map.addImage(id, img, { pixelRatio: 2 });
+  }
+}
+
+function setSoftDisc(
+  data: Uint8Array,
+  size: number,
+  cx: number,
+  cy: number,
+  radius: number,
+  r: number,
+  g: number,
+  b: number,
+  maxAlpha: number,
+): void {
+  const minX = Math.max(0, Math.floor(cx - radius - 1));
+  const maxX = Math.min(size - 1, Math.ceil(cx + radius + 1));
+  const minY = Math.max(0, Math.floor(cy - radius - 1));
+  const maxY = Math.min(size - 1, Math.ceil(cy + radius + 1));
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      const dist = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+      const t = Math.max(0, Math.min(1, radius + 0.5 - dist));
+      if (t > 0) {
+        const idx = (y * size + x) * 4;
+        const a = Math.round(t * maxAlpha);
+        if (a > data[idx + 3]) {
+          data[idx] = r;
+          data[idx + 1] = g;
+          data[idx + 2] = b;
+          data[idx + 3] = a;
+        }
+      }
+    }
+  }
+}
+
+function createSceneryPatternImages(): Record<
+  string,
+  { width: number; height: number; data: Uint8Array }
+> {
+  // 1. Sand & beach stipple grains (32x32 @ 2x = 16x16 CSS px)
+  const sandSize = 32;
+  const sandData = new Uint8Array(sandSize * sandSize * 4);
+  const sandGrains: [number, number, number][] = [
+    [5, 6, 1.25],
+    [15, 4, 1.05],
+    [26, 8, 1.3],
+    [10, 14, 1.15],
+    [21, 15, 1.25],
+    [4, 23, 1.1],
+    [14, 25, 1.3],
+    [27, 22, 1.15],
+    [9, 30, 1.05],
+    [22, 29, 1.2],
+  ];
+  for (const [gx, gy, gr] of sandGrains) {
+    setSoftDisc(sandData, sandSize, gx, gy, gr, 148, 98, 30, 115);
+  }
+
+  // 3. Orchard & vineyard neat rows (32x32 @ 2x = 16x16 CSS px)
+  const orchardSize = 32;
+  const orchardData = new Uint8Array(orchardSize * orchardSize * 4);
+  for (const [ox, oy] of [
+    [8, 8],
+    [24, 8],
+    [16, 24],
+    [0, 24],
+    [32, 24],
+  ]) {
+    setSoftDisc(orchardData, orchardSize, ox, oy, 2.4, 52, 98, 20, 96);
+  }
+
+  // 4. Scrub / heath low bush tufts (40x40 @ 2x = 20x20 CSS px)
+  const scrubSize = 40;
+  const scrubData = new Uint8Array(scrubSize * scrubSize * 4);
+  for (const [sx, sy] of [
+    [10, 12],
+    [30, 32],
+  ]) {
+    setSoftDisc(scrubData, scrubSize, sx - 2.2, sy, 1.5, 70, 96, 36, 90);
+    setSoftDisc(scrubData, scrubSize, sx, sy - 1.3, 1.7, 70, 96, 36, 95);
+    setSoftDisc(scrubData, scrubSize, sx + 2.2, sy, 1.5, 70, 96, 36, 90);
+  }
+
+  // 5. Wetland / marsh horizontal water dashes & reed tufts (48x48 @ 2x = 24x24 CSS px)
+  const wetlandSize = 48;
+  const wetlandData = new Uint8Array(wetlandSize * wetlandSize * 4);
+  for (const [wx, wy] of [
+    [12, 16],
+    [36, 40],
+  ]) {
+    // Horizontal marsh water lines
+    for (let dx = -6; dx <= 6; dx++) {
+      const idx1 = (wy * wetlandSize + ((wx + dx + wetlandSize) % wetlandSize)) * 4;
+      wetlandData[idx1] = 20;
+      wetlandData[idx1 + 1] = 118;
+      wetlandData[idx1 + 2] = 110;
+      wetlandData[idx1 + 3] = 95;
+    }
+    for (let dx = -4; dx <= 4; dx++) {
+      const idx2 = (((wy + 2) % wetlandSize) * wetlandSize + ((wx + dx + wetlandSize) % wetlandSize)) * 4;
+      wetlandData[idx2] = 20;
+      wetlandData[idx2 + 1] = 118;
+      wetlandData[idx2 + 2] = 110;
+      wetlandData[idx2 + 3] = 75;
+    }
+    // Vertical reed stalks
+    for (let dy = -5; dy <= -1; dy++) {
+      for (const rx of [wx - 2, wx, wx + 2]) {
+        const idxR = (((wy + dy + wetlandSize) % wetlandSize) * wetlandSize + rx) * 4;
+        wetlandData[idxR] = 22;
+        wetlandData[idxR + 1] = 108;
+        wetlandData[idxR + 2] = 92;
+        wetlandData[idxR + 3] = 95;
+      }
+    }
+  }
+
+  return {
+    'scenery-pattern-sand': { width: sandSize, height: sandSize, data: sandData },
+    'scenery-pattern-orchard': { width: orchardSize, height: orchardSize, data: orchardData },
+    'scenery-pattern-scrub': { width: scrubSize, height: scrubSize, data: scrubData },
+    'scenery-pattern-wetland': { width: wetlandSize, height: wetlandSize, data: wetlandData },
+  };
 }
 
 function buildCycleRouteLabelLayers(): any[] {
@@ -574,27 +634,38 @@ function buildCycleRouteLabelLayers(): any[] {
 
   return [
     makeShieldLayer(
+      'ocm-route-label-proposed',
+      8,
+      ['all', ['==', ['get', 'state'], 'proposed'], ['has', 'ref']],
+      'cycle-shield-proposed',
+    ),
+    makeShieldLayer(
       'ocm-route-label-mtb',
       9,
-      ['all', ['==', ['get', 'network'], 'mtb'], ['has', 'ref']],
+      ['all', ['==', ['get', 'network'], 'mtb'], ['!=', ['get', 'state'], 'proposed'], ['has', 'ref']],
       'cycle-shield-mtb',
     ),
     makeShieldLayer(
       'ocm-route-label-lcn',
       9,
-      ['all', ['==', ['get', 'network'], 'lcn'], ['has', 'ref']],
+      ['all', ['==', ['get', 'network'], 'lcn'], ['!=', ['get', 'state'], 'proposed'], ['has', 'ref']],
       'cycle-shield-lcn',
     ),
     makeShieldLayer(
       'ocm-route-label-rcn',
       8,
-      ['all', ['==', ['get', 'network'], 'rcn'], ['has', 'ref']],
+      ['all', ['==', ['get', 'network'], 'rcn'], ['!=', ['get', 'state'], 'proposed'], ['has', 'ref']],
       'cycle-shield-rcn',
     ),
     makeShieldLayer(
       'ocm-route-label-ncn',
       7,
-      ['all', ['in', ['get', 'network'], ['literal', ['ncn', 'icn']]], ['has', 'ref']],
+      [
+        'all',
+        ['in', ['get', 'network'], ['literal', ['ncn', 'icn']]],
+        ['!=', ['get', 'state'], 'proposed'],
+        ['has', 'ref'],
+      ],
       'cycle-shield-ncn',
     ),
   ];
@@ -607,19 +678,236 @@ export function getOfflineStyle(basemap: Basemap = 'dense'): maplibregl.StyleSpe
   return getOpenCycleMapVectorStyle(true);
 }
 
+function buildSceneryLandcoverLayers(isLight: boolean): any[] {
+  const layers: any[] = [
+    {
+      id: 'dense-landcover-farmland',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'landcover',
+      minzoom: 0,
+      filter: [
+        'all',
+        ['==', ['get', 'class'], 'farmland'],
+        ['!', ['match', ['get', 'subclass'], ['orchard', 'vineyard', 'plant_nursery'], true, false]],
+      ],
+      paint: {
+        'fill-antialias': true,
+        'fill-color': isLight
+          ? '#f0e4bc'
+          : ['interpolate', ['linear'], ['zoom'], 6, '#e3ce8c', 10, '#e7d59a', 13, '#eadba8'],
+        'fill-opacity': isLight
+          ? 0.58
+          : ['interpolate', ['linear'], ['zoom'], 6, 0.88, 10, 0.82, 13, 0.75],
+        'fill-outline-color': isLight ? 'rgba(180, 154, 96, 0.25)' : 'rgba(162, 134, 76, 0.35)',
+      },
+    },
+    {
+      id: 'dense-landcover-orchard',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'landcover',
+      minzoom: 0,
+      filter: [
+        'all',
+        ['==', ['get', 'class'], 'farmland'],
+        ['match', ['get', 'subclass'], ['orchard', 'vineyard', 'plant_nursery'], true, false],
+      ],
+      paint: {
+        'fill-antialias': true,
+        'fill-color': isLight ? '#d8eab8' : '#cde3a4',
+        'fill-opacity': isLight ? 0.62 : 0.8,
+      },
+    },
+    {
+      id: 'dense-landcover-heath-moor',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'landcover',
+      minzoom: 0,
+      filter: [
+        'all',
+        ['==', ['get', 'class'], 'grass'],
+        ['match', ['get', 'subclass'], ['heath', 'moor', 'fell', 'tundra'], true, false],
+      ],
+      paint: {
+        'fill-antialias': true,
+        'fill-color': isLight
+          ? '#e3d2c6'
+          : ['interpolate', ['linear'], ['zoom'], 6, '#cfb49d', 10, '#d5bcab', 13, '#d9c3b4'],
+        'fill-opacity': isLight
+          ? 0.65
+          : ['interpolate', ['linear'], ['zoom'], 6, 0.88, 10, 0.85, 13, 0.82],
+      },
+    },
+    {
+      id: 'dense-landcover-scrub',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'landcover',
+      minzoom: 0,
+      filter: ['all', ['==', ['get', 'class'], 'grass'], ['==', ['get', 'subclass'], 'scrub']],
+      paint: {
+        'fill-antialias': true,
+        'fill-color': isLight ? '#c8e2b0' : '#b2d694',
+        'fill-opacity': isLight ? 0.6 : 0.82,
+      },
+    },
+  ];
+
+  if (!isLight) {
+    layers.push(
+      {
+        id: 'dense-landcover-orchard-pattern',
+        type: 'fill',
+        source: 'openmaptiles',
+        'source-layer': 'landcover',
+        minzoom: 11,
+        filter: [
+          'all',
+          ['==', ['get', 'class'], 'farmland'],
+          ['match', ['get', 'subclass'], ['orchard', 'vineyard', 'plant_nursery'], true, false],
+        ],
+        paint: {
+          'fill-pattern': 'scenery-pattern-orchard',
+          'fill-opacity': 0.75,
+        },
+      },
+      {
+        id: 'dense-landcover-scrub-pattern',
+        type: 'fill',
+        source: 'openmaptiles',
+        'source-layer': 'landcover',
+        minzoom: 11,
+        filter: [
+          'all',
+          ['==', ['get', 'class'], 'grass'],
+          ['match', ['get', 'subclass'], ['scrub', 'heath', 'moor'], true, false],
+        ],
+        paint: {
+          'fill-pattern': 'scenery-pattern-scrub',
+          'fill-opacity': 0.68,
+        },
+      },
+    );
+  }
+
+  layers.push(
+    {
+      id: 'dense-landcover-sand',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'landcover',
+      minzoom: 0,
+      filter: ['==', ['get', 'class'], 'sand'],
+      paint: {
+        'fill-antialias': true,
+        'fill-color': isLight ? '#f7da94' : '#f4cf7d',
+        'fill-opacity': isLight ? 0.8 : 0.9,
+        'fill-outline-color': isLight ? 'rgba(196, 150, 62, 0.32)' : 'rgba(180, 132, 48, 0.42)',
+      },
+    },
+    {
+      id: 'dense-landcover-sand-pattern',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'landcover',
+      minzoom: 10,
+      filter: ['==', ['get', 'class'], 'sand'],
+      paint: {
+        'fill-pattern': 'scenery-pattern-sand',
+        'fill-opacity': isLight ? 0.6 : 0.8,
+      },
+    },
+    {
+      id: 'dense-landcover-wetland',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'landcover',
+      minzoom: 0,
+      filter: ['==', ['get', 'class'], 'wetland'],
+      paint: {
+        'fill-antialias': true,
+        'fill-color': isLight ? 'hsla(168, 44%, 74%, 0.42)' : 'hsla(168, 46%, 70%, 0.58)',
+      },
+    },
+    {
+      id: 'dense-landcover-wetland-pattern',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'landcover',
+      minzoom: 10,
+      filter: ['==', ['get', 'class'], 'wetland'],
+      paint: {
+        'fill-pattern': 'scenery-pattern-wetland',
+        'fill-opacity': isLight ? 0.55 : 0.72,
+      },
+    },
+    {
+      id: 'dense-landcover-rock',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'landcover',
+      minzoom: 0,
+      filter: ['==', ['get', 'class'], 'rock'],
+      paint: {
+        'fill-antialias': true,
+        'fill-color': isLight ? '#dcd8d0' : '#d1ccc3',
+        'fill-opacity': isLight ? 0.65 : 0.82,
+        'fill-outline-color': isLight ? 'rgba(120, 113, 108, 0.24)' : 'rgba(100, 94, 88, 0.34)',
+      },
+    },
+  );
+
+  return layers;
+}
+
+function buildParkForestLabelLayer(isLight: boolean): any {
+  return {
+    id: 'dense-park-label',
+    type: 'symbol',
+    source: 'openmaptiles',
+    'source-layer': 'park',
+    minzoom: isLight ? 11.5 : 10.5,
+    filter: [
+      'all',
+      ['==', ['geometry-type'], 'Point'],
+      ['has', 'name'],
+      [
+        'step',
+        ['zoom'],
+        ['<=', ['coalesce', ['get', 'rank'], 99], 1],
+        12,
+        ['<=', ['coalesce', ['get', 'rank'], 99], 2],
+        13.5,
+        ['<=', ['coalesce', ['get', 'rank'], 99], 4],
+        15,
+        true,
+      ],
+    ],
+    layout: {
+      'text-field': ['coalesce', ['get', 'name_en'], ['get', 'name']],
+      'text-font': ['Noto Sans Italic'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 10.5, 10, 14, 11.5],
+      'text-max-width': 8,
+      'text-padding': isLight ? 48 : 36,
+    },
+    paint: {
+      'text-color': isLight ? '#2f6f44' : '#166534',
+      'text-opacity': isLight ? 0.82 : 0.92,
+      'text-halo-color': 'rgba(255, 255, 255, 0.85)',
+      'text-halo-width': 1.2,
+    },
+  };
+}
+
 export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecification {
   const style = getOpenCycleMapVectorStyle(false);
   const layers = style.layers as any[];
 
-  // 1. Boost woodland & park landcover richness, separate tracks from paved minor roads, and show trails/labels earlier
+  // 1. Separate tracks from paved minor roads and tune trail/road/place label zooms
   for (const layer of layers) {
-    if (layer.id === 'landcover-wood' && layer.paint) {
-      layer.paint['fill-color'] = 'hsla(104, 46%, 64%, 0.48)';
-      layer.paint['fill-opacity'] = 0.65;
-    } else if (layer.id === 'park' && layer.paint) {
-      layer.paint['fill-color'] = '#d5ebd0';
-      layer.paint['fill-opacity'] = 0.6;
-    } else if (
+    if (
       layer.id === 'highway-minor-casing' ||
       layer.id === 'highway-minor' ||
       layer.id === 'bridge-minor-casing' ||
@@ -664,95 +952,12 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
     } else if (layer.id === 'poi_r20') {
       layer.minzoom = 17;
     } else if (layer.id === 'label_village') {
-      layer.minzoom = 8;
+      layer.minzoom = 10.5;
+      if (layer.layout) layer.layout['text-padding'] = 14;
     } else if (layer.id === 'label_other') {
-      layer.minzoom = 7.5;
+      layer.minzoom = 12.5;
+      if (layer.layout) layer.layout['text-padding'] = 20;
     }
-  }
-
-  // 1b. Insert natural terrain landcover layers (farmland, heath/moorland, scrub, wetland, rock/scree)
-  const grassIdx = layers.findIndex((l) => l.id === 'landcover-grass');
-  const terrainLandcoverLayers: any[] = [
-    {
-      id: 'dense-landcover-farmland',
-      type: 'fill',
-      source: 'openmaptiles',
-      'source-layer': 'landcover',
-      minzoom: 8,
-      filter: ['==', ['get', 'class'], 'farmland'],
-      paint: {
-        'fill-color': '#f2efe2',
-        'fill-opacity': 0.55,
-      },
-    },
-    {
-      id: 'dense-landcover-heath-moor',
-      type: 'fill',
-      source: 'openmaptiles',
-      'source-layer': 'landcover',
-      minzoom: 7,
-      filter: [
-        'all',
-        ['==', ['get', 'class'], 'grass'],
-        ['match', ['get', 'subclass'], ['heath', 'moor', 'fell', 'tundra'], true, false],
-      ],
-      paint: {
-        'fill-color': '#e3dbc3',
-        'fill-opacity': 0.78,
-      },
-    },
-    {
-      id: 'dense-landcover-scrub',
-      type: 'fill',
-      source: 'openmaptiles',
-      'source-layer': 'landcover',
-      minzoom: 8,
-      filter: ['all', ['==', ['get', 'class'], 'grass'], ['==', ['get', 'subclass'], 'scrub']],
-      paint: {
-        'fill-color': '#cde0b8',
-        'fill-opacity': 0.72,
-      },
-    },
-    {
-      id: 'dense-landcover-wetland',
-      type: 'fill',
-      source: 'openmaptiles',
-      'source-layer': 'landcover',
-      minzoom: 7,
-      filter: ['==', ['get', 'class'], 'wetland'],
-      paint: {
-        'fill-color': 'hsla(168, 42%, 75%, 0.45)',
-      },
-    },
-    {
-      id: 'dense-landcover-wetland-pattern',
-      type: 'fill',
-      source: 'openmaptiles',
-      'source-layer': 'landcover',
-      minzoom: 10,
-      filter: ['==', ['get', 'class'], 'wetland'],
-      paint: {
-        'fill-pattern': 'wetland_11',
-        'fill-opacity': 0.5,
-      },
-    },
-    {
-      id: 'dense-landcover-rock',
-      type: 'fill',
-      source: 'openmaptiles',
-      'source-layer': 'landcover',
-      minzoom: 8,
-      filter: ['==', ['get', 'class'], 'rock'],
-      paint: {
-        'fill-color': '#d6d3d1',
-        'fill-opacity': 0.7,
-      },
-    },
-  ];
-  if (grassIdx >= 0) {
-    layers.splice(grassIdx + 1, 0, ...terrainLandcoverLayers);
-  } else {
-    layers.unshift(...terrainLandcoverLayers);
   }
 
   // 2. Add hillshade and 10m/50m contour lines below water & roads when online
@@ -825,11 +1030,11 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
     type: 'line',
     source: 'openmaptiles',
     'source-layer': 'park',
-    minzoom: 8,
+    minzoom: 6,
     paint: {
       'line-color': '#4d7c0f',
-      'line-opacity': 0.45,
-      'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1.0, 13, 1.8],
+      'line-opacity': ['interpolate', ['linear'], ['zoom'], 6, 0.55, 11, 0.45],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.9, 13, 1.8],
       'line-dasharray': [3, 2],
     },
   };
@@ -1000,25 +1205,6 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
       },
     },
     {
-      id: 'dense-park-label',
-      type: 'symbol',
-      source: 'openmaptiles',
-      'source-layer': 'park',
-      minzoom: 9,
-      filter: ['has', 'name'],
-      layout: {
-        'text-field': ['coalesce', ['get', 'name_en'], ['get', 'name']],
-        'text-font': ['Noto Sans Italic'],
-        'text-size': ['interpolate', ['linear'], ['zoom'], 9, 10, 13, 12],
-        'text-max-width': 8,
-      },
-      paint: {
-        'text-color': '#166534',
-        'text-halo-color': 'rgba(255, 255, 255, 0.85)',
-        'text-halo-width': 1.2,
-      },
-    },
-    {
       id: 'dense-poi-cycling-outdoor',
       type: 'symbol',
       source: 'openmaptiles',
@@ -1127,11 +1313,24 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
       type: 'symbol',
       source: 'openmaptiles',
       'source-layer': 'mountain_peak',
-      minzoom: 9,
-      filter: ['has', 'name'],
+      minzoom: 11,
+      filter: [
+        'all',
+        ['has', 'name'],
+        [
+          'step',
+          ['zoom'],
+          ['<=', ['coalesce', ['get', 'rank'], 99], 1],
+          12.5,
+          ['<=', ['coalesce', ['get', 'rank'], 99], 3],
+          14,
+          true,
+        ],
+      ],
       layout: {
         'icon-image': 'mountain_11',
         'icon-size': 0.9,
+        'icon-padding': 16,
         'text-anchor': 'top',
         'text-field': [
           'case',
@@ -1148,7 +1347,8 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
         'text-font': ['Noto Sans Italic'],
         'text-max-width': 8,
         'text-offset': [0, 0.55],
-        'text-size': ['interpolate', ['linear'], ['zoom'], 9, 10, 13, 11.5],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 11, 10, 14, 11.5],
+        'text-padding': 32,
       },
       paint: {
         'text-color': '#7c2d12',
@@ -1291,13 +1491,48 @@ export function getOpenCycleMapVectorStyle(isLight = true): maplibregl.StyleSpec
       ];
     }
 
+    if (layer.paint) {
+      if (layer.id === 'park') {
+        layer.filter = [
+          'all',
+          ['match', ['geometry-type'], ['MultiPolygon', 'Polygon'], true, false],
+          ['!=', ['get', 'class'], 'public_park'],
+        ];
+        layer.paint['fill-antialias'] = true;
+        layer.paint['fill-color'] = isLight ? '#dff0d8' : '#b8e0ab';
+        layer.paint['fill-opacity'] = isLight
+          ? 0.16
+          : ['interpolate', ['linear'], ['zoom'], 5, 0.55, 9, 0.42, 12, 0.24];
+      } else if (layer.id === 'landcover-grass-park') {
+        layer.paint['fill-antialias'] = true;
+        layer.paint['fill-color'] = isLight ? '#d5eac3' : '#cce6b8';
+        layer.paint['fill-opacity'] = isLight ? 0.42 : 0.62;
+      } else if (layer.id === 'landcover-grass') {
+        layer.filter = [
+          'all',
+          ['==', ['get', 'class'], 'grass'],
+          ['!', ['match', ['get', 'subclass'], ['heath', 'moor', 'fell', 'tundra', 'scrub'], true, false]],
+        ];
+        layer.paint['fill-antialias'] = true;
+        layer.paint['fill-color'] = isLight ? '#d5eac3' : '#c6e4ae';
+        layer.paint['fill-opacity'] = isLight ? 0.48 : 0.8;
+      } else if (layer.id === 'landcover-wood') {
+        layer.paint['fill-antialias'] = true;
+        layer.paint['fill-color'] = isLight
+          ? '#8bc978'
+          : ['interpolate', ['linear'], ['zoom'], 6, '#52a63e', 10, '#62b24e', 13, '#72bb5f'];
+        layer.paint['fill-opacity'] = isLight
+          ? 0.42
+          : ['interpolate', ['linear'], ['zoom'], 6, 0.86, 10, 0.76, 13, 0.66];
+        layer.paint['fill-outline-color'] = isLight
+          ? 'rgba(54, 112, 45, 0.18)'
+          : 'rgba(42, 98, 32, 0.34)';
+      }
+    }
+
     if (isLight && layer.paint) {
       if (layer.id === 'background') {
         layer.paint['background-color'] = '#fbfaf8';
-      } else if (layer.id === 'landcover-wood') {
-        layer.paint['fill-opacity'] = 0.22;
-      } else if (layer.id === 'landcover-grass' || layer.id === 'park') {
-        layer.paint['fill-opacity'] = 0.28;
       } else if (layer.id.startsWith('landuse-')) {
         layer.paint['fill-opacity'] = 0.35;
       } else if (layer.id === 'water') {
@@ -1323,16 +1558,93 @@ export function getOpenCycleMapVectorStyle(isLight = true): maplibregl.StyleSpec
         layer.id === 'highway-trunk'
       ) {
         layer.paint['line-color'] = '#fff9e0';
+      } else if (layer.id === 'label_other') {
+        layer.minzoom = 13.5;
+        if (layer.layout) layer.layout['text-padding'] = 28;
+        layer.paint['text-color'] = '#94a3b8';
+      } else if (layer.id === 'label_village') {
+        layer.minzoom = 11.5;
+        if (layer.layout) layer.layout['text-padding'] = 20;
+        layer.paint['text-color'] = '#64748b';
+      } else if (layer.id === 'label_town') {
+        if (layer.layout) layer.layout['text-padding'] = 14;
+        layer.paint['text-color'] = '#475569';
+      } else if (layer.id === 'label_city' || layer.id === 'label_city_capital') {
+        layer.paint['text-color'] = '#334155';
       }
     }
   }
 
-  // Insert route highlight bands underneath road fills (before highway-path) so roads & routes sit cleanly inside the halo
+  // Order landcover layers bottom-to-top: park -> grass-park -> farmland/orchard -> grass -> heath/scrub -> wood -> wetland/rock/sand
+  const grassParkIdx = baseLayers.findIndex((l) => l.id === 'landcover-grass-park');
+  const parkIdx = baseLayers.findIndex((l) => l.id === 'park');
+  if (grassParkIdx >= 0 && parkIdx >= 0 && grassParkIdx > parkIdx + 1) {
+    const [grassParkLayer] = baseLayers.splice(grassParkIdx, 1);
+    baseLayers.splice(parkIdx + 1, 0, grassParkLayer);
+  }
+
+  const grassIdx = baseLayers.findIndex((l) => l.id === 'landcover-grass');
+  const sceneryLayers = buildSceneryLandcoverLayers(isLight);
+  if (grassIdx >= 0) {
+    baseLayers.splice(grassIdx + 1, 0, ...sceneryLayers);
+  } else {
+    baseLayers.unshift(...sceneryLayers);
+  }
+
+  // Move farmland & orchards before landcover-grass, and move landcover-wood right before dense-landcover-wood-pattern
+  for (const id of [
+    'dense-landcover-orchard-pattern',
+    'dense-landcover-orchard',
+    'dense-landcover-farmland',
+  ]) {
+    const idx = baseLayers.findIndex((l) => l.id === id);
+    const targetGrassIdx = baseLayers.findIndex((l) => l.id === 'landcover-grass');
+    if (idx >= 0 && targetGrassIdx >= 0 && idx > targetGrassIdx) {
+      const [layer] = baseLayers.splice(idx, 1);
+      baseLayers.splice(targetGrassIdx, 0, layer);
+    }
+  }
+  const woodIdx = baseLayers.findIndex((l) => l.id === 'landcover-wood');
+  const woodAnchorIdx = baseLayers.findIndex((l) => l.id === 'dense-landcover-sand');
+  if (woodIdx >= 0 && woodAnchorIdx >= 0 && woodIdx < woodAnchorIdx) {
+    const [woodLayer] = baseLayers.splice(woodIdx, 1);
+    const newAnchorIdx = baseLayers.findIndex((l) => l.id === 'dense-landcover-sand');
+    baseLayers.splice(newAnchorIdx, 0, woodLayer);
+  }
+
+  // Insert toned-down forest & park name labels in both Light and Dense
+  const labelOtherIdx = baseLayers.findIndex((l) => l.id === 'label_other');
+  const parkLabelLayer = buildParkForestLabelLayer(isLight);
+  if (labelOtherIdx >= 0) {
+    baseLayers.splice(labelOtherIdx, 0, parkLabelLayer);
+  } else {
+    baseLayers.push(parkLabelLayer);
+  }
+
+  // Insert route highlight bands underneath road fills (before highway-path) so roads & routes sit cleanly inside the halo.
+  // Keep line-opacity at 1 (softening hex stops instead in Light mode) so round caps and shared ways never double-blend at vertices.
   const roadFillIdx = baseLayers.findIndex((l) => l.id === 'highway-path');
   const routeLayers = buildCycleRouteHighlightLayers();
   if (isLight) {
+    const softenHex = (hex: string, weight = 0.65): string => {
+      if (!hex.startsWith('#') || hex.length !== 7) return hex;
+      const r = Math.round(parseInt(hex.slice(1, 3), 16) * weight + 251 * (1 - weight));
+      const g = Math.round(parseInt(hex.slice(3, 5), 16) * weight + 250 * (1 - weight));
+      const b = Math.round(parseInt(hex.slice(5, 7), 16) * weight + 248 * (1 - weight));
+      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    };
     for (const layer of routeLayers) {
-      if (layer.paint) layer.paint['line-opacity'] = 0.55;
+      if (layer.paint) {
+        layer.paint['line-opacity'] = 1;
+        const colorExpr = layer.paint['line-color'];
+        if (Array.isArray(colorExpr)) {
+          layer.paint['line-color'] = colorExpr.map((item) =>
+            typeof item === 'string' && item.startsWith('#') ? softenHex(item) : item,
+          );
+        } else if (typeof colorExpr === 'string' && colorExpr.startsWith('#')) {
+          layer.paint['line-color'] = softenHex(colorExpr);
+        }
+      }
     }
   }
   if (roadFillIdx >= 0) {

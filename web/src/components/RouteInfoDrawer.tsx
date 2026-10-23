@@ -2,6 +2,8 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   getSlotColor,
   PROFILE_INFO,
+  type ProfileMeta,
+  type ProfileName,
   type RouteSlotState,
 } from '../types.ts';
 import type { SegmentHighlight, SegmentData } from '../utils/classification.ts';
@@ -27,6 +29,7 @@ const ALTERNATIVES = [
 
 interface RouteInfoDrawerProps {
   slots: RouteSlotState[];
+  getProfileMeta?: (profileId: ProfileName) => ProfileMeta;
   units: Units;
   onSelectSlotAlternative: (slotIdx: number, altIdx: number) => void;
   onRemoveSlot?: (slotIdx: number) => void;
@@ -72,6 +75,7 @@ function parseRouteFeatureCollection(
 
 export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
   slots,
+  getProfileMeta,
   units,
   onSelectSlotAlternative,
   onRemoveSlot,
@@ -141,7 +145,7 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
         if (!routeData && !slot.isRouting) return null;
 
         const slotColor = getSlotColor(slot, slotIdx);
-        const profileMeta = PROFILE_INFO[slot.profile];
+        const profileMeta = getProfileMeta ? getProfileMeta(slot.profile) : PROFILE_INFO[slot.profile];
         const barCollapsed = Boolean(collapsedBySlot[slotIdx]);
 
         return (

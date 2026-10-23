@@ -7,12 +7,19 @@ import {
   ROUTE_COLOR_PALETTE,
   type AvoidArea,
   type LatLon,
+  type PointWayInfo,
+  type ProfileMeta,
   type ProfileName,
   type RouteSlotState,
   type WorkerMessage,
 } from '../types.ts';
 import { HistoryStack } from '../history.ts';
 import { legIndexAt } from '../utils/geo.ts';
+import {
+  loadSavedCustomProfiles,
+  saveCustomProfilesToStorage,
+  type CustomProfileRecord,
+} from '../utils/profile-editor.ts';
 
 const STORAGE_KEY = 'rsrouter_route';
 const MAX_UNDO = 50;
@@ -28,7 +35,12 @@ function validPoint(lat: number, lon: number): boolean {
 }
 
 function validProfile(p: string | undefined): p is ProfileName {
-  return !!p && p in PROFILE_INFO;
+  if (!p) return false;
+  if (p in PROFILE_INFO) return true;
+  if (p.startsWith('custom:')) {
+    return loadSavedCustomProfiles().some((c) => c.id === p);
+  }
+  return false;
 }
 
 function parseProfilesParam(raw: string | undefined): ProfileName[] | undefined {
@@ -128,6 +140,10 @@ function mergeSavedWaypointNames(waypoints: LatLon[], saved: LatLon[] | undefine
 }
 
 export function useRouting(isOfflineMode: boolean) {
+  const [customProfiles, setCustomProfiles] = useState<CustomProfileRecord[]>(() =>
+    loadSavedCustomProfiles(),
+  );
+  const [customProfileError, setCustomProfileError] = useState<string | null>(null);
   const [slots, setSlotsState] = useState<RouteSlotState[]>([
     { profile: PROFILE_ORDER[0], alternativeIdx: 0, route: null, isRouting: false },
   ]);
@@ -143,17 +159,57 @@ export function useRouting(isOfflineMode: boolean) {
   const workerRef = useRef<Worker | null>(null);
   const activeSlotRouteIdRef = useRef<Array<string | null>>([null]);
   const activeImportIdRef = useRef<string | null>(null);
+  const pendingInspectCallbacksRef = useRef<Map<string, (info: PointWayInfo | null) => void>>(
+    new Map(),
+  );
   const initCompletedRef = useRef<boolean>(false);
   const routeCounterRef = useRef<number>(0);
   const requestedSlotAltRef = useRef<number[]>([0]);
   const shownSlotAltRef = useRef<number[]>([0]);
 
+  const customProfilesRef = useRef<CustomProfileRecord[]>(customProfiles);
+  customProfilesRef.current = customProfiles;
   const slotsRef = useRef<RouteSlotState[]>(slots);
   slotsRef.current = slots;
   const waypointsRef = useRef(waypoints);
   waypointsRef.current = waypoints;
   const avoidAreasRef = useRef(avoidAreas);
   avoidAreasRef.current = avoidAreas;
+
+  const getProfileMeta = useCallback(
+    (profileId: ProfileName): ProfileMeta => {
+      if (profileId in PROFILE_INFO) {
+        return PROFILE_INFO[profileId];
+      }
+      const found = customProfiles.find((c) => c.id === profileId);
+      if (found) {
+        return {
+          id: found.id,
+          label: found.name,
+          shortLabel: found.name,
+          summary: found.summary || 'Custom routing profile.',
+          isCustom: true,
+        };
+      }
+      if (profileId === 'custom:__draft__') {
+        return {
+          id: profileId,
+          label: 'Live Editor Draft',
+          shortLabel: 'Live Draft',
+          summary: 'Unsaved profile currently being edited.',
+          isCustom: true,
+        };
+      }
+      return {
+        id: profileId,
+        label: profileId,
+        shortLabel: profileId,
+        summary: 'Custom routing profile.',
+        isCustom: true,
+      };
+    },
+    [customProfiles],
+  );
 
   const updateUndoRedo = useCallback(() => {
     setCanUndo(historyRef.current.canUndo());
@@ -298,6 +354,22 @@ export function useRouting(isOfflineMode: boolean) {
           }
           break;
         }
+        case 'CUSTOM_PROFILE_LOADED': {
+          if (msg.ok) {
+            setCustomProfileError(null);
+          } else {
+            setCustomProfileError(msg.error || 'Failed to parse profile');
+          }
+          break;
+        }
+        case 'INSPECT_POINT_SUCCESS': {
+          const cb = pendingInspectCallbacksRef.current.get(msg.id);
+          if (cb) {
+            pendingInspectCallbacksRef.current.delete(msg.id);
+            cb(msg.payload);
+          }
+          break;
+        }
         case 'ROUTE_SUCCESS': {
           const slotIdx = activeSlotRouteIdRef.current.indexOf(msg.id);
           if (slotIdx === -1) break;
@@ -412,6 +484,13 @@ export function useRouting(isOfflineMode: boolean) {
 
     worker.postMessage({ type: 'SET_OFFLINE_MODE', offline: isOfflineMode } satisfies WorkerMessage);
     worker.postMessage({ type: 'INIT' } satisfies WorkerMessage);
+    for (const cp of customProfilesRef.current) {
+      worker.postMessage({
+        type: 'LOAD_CUSTOM_PROFILE',
+        name: cp.id,
+        content: cp.dsl,
+      } satisfies WorkerMessage);
+    }
 
     // Initial load from Hash or LocalStorage
     const fromLink = /(?:^#|&)(?:r|nogos|p)=/.test(location.hash);
@@ -960,6 +1039,21 @@ export function useRouting(isOfflineMode: boolean) {
     setFitBoundsSeq((s) => s + 1);
   }, []);
 
+  const inspectPoint = useCallback((lon: number, lat: number, maxDistanceM = 45): Promise<PointWayInfo | null> => {
+    if (!workerRef.current) return Promise.resolve(null);
+    const id = `inspect-${++routeCounterRef.current}`;
+    return new Promise<PointWayInfo | null>((resolve) => {
+      pendingInspectCallbacksRef.current.set(id, resolve);
+      workerRef.current?.postMessage({
+        type: 'INSPECT_POINT_REQUEST',
+        id,
+        lon,
+        lat,
+        maxDistanceM,
+      } satisfies WorkerMessage);
+    });
+  }, []);
+
   const importGpxContent = useCallback((gpxXml: string, toleranceM = 20) => {
     if (!workerRef.current) return;
     setStatus('Matching GPX to road network...');
@@ -999,6 +1093,95 @@ export function useRouting(isOfflineMode: boolean) {
     [importGpxContent],
   );
 
+  const updateCustomProfileDsl = useCallback(
+    (profileId: ProfileName, content: string, recomputeActiveSlots = true) => {
+      if (!workerRef.current) return;
+      workerRef.current.postMessage({
+        type: 'LOAD_CUSTOM_PROFILE',
+        name: profileId,
+        content,
+      } satisfies WorkerMessage);
+
+      if (recomputeActiveSlots && waypointsRef.current.length >= 2) {
+        const currentSlots = slotsRef.current;
+        const matchingSlotIndices: number[] = [];
+        currentSlots.forEach((s, idx) => {
+          if (s.profile === profileId) {
+            matchingSlotIndices.push(idx);
+          }
+        });
+        if (matchingSlotIndices.length > 0) {
+          const nextSlots = currentSlots.map((s) =>
+            s.profile === profileId ? { ...s, isRouting: true } : s,
+          );
+          slotsRef.current = nextSlots;
+          setSlotsState(nextSlots);
+          setStatus('Calculating route...');
+          setIsError(false);
+          for (const idx of matchingSlotIndices) {
+            postSlotRouteRequest(
+              idx,
+              waypointsRef.current,
+              profileId,
+              avoidAreasRef.current,
+              nextSlots[idx].alternativeIdx,
+            );
+          }
+        }
+      }
+    },
+    [postSlotRouteRequest],
+  );
+
+  const saveCustomProfile = useCallback(
+    (record: CustomProfileRecord) => {
+      setCustomProfiles((prev) => {
+        const exists = prev.some((c) => c.id === record.id);
+        const next = exists
+          ? prev.map((c) => (c.id === record.id ? record : c))
+          : [...prev, record];
+        customProfilesRef.current = next;
+        saveCustomProfilesToStorage(next);
+        return next;
+      });
+      updateCustomProfileDsl(record.id, record.dsl, true);
+    },
+    [updateCustomProfileDsl],
+  );
+
+  const deleteCustomProfile = useCallback(
+    (profileId: string) => {
+      setCustomProfiles((prev) => {
+        const next = prev.filter((c) => c.id !== profileId);
+        customProfilesRef.current = next;
+        saveCustomProfilesToStorage(next);
+        return next;
+      });
+      const currentSlots = slotsRef.current;
+      if (currentSlots.some((s) => s.profile === profileId)) {
+        const fallback = PROFILE_ORDER[0];
+        const nextSlots = currentSlots.map((s) =>
+          s.profile === profileId
+            ? { ...s, profile: fallback, alternativeIdx: 0, isRouting: waypointsRef.current.length >= 2 }
+            : s,
+        );
+        slotsRef.current = nextSlots;
+        setSlotsState(nextSlots);
+        saveToUrlAndStorage(
+          waypointsRef.current,
+          nextSlots.map((s) => s.profile),
+          avoidAreasRef.current,
+        );
+        nextSlots.forEach((_, idx) => {
+          if (currentSlots[idx].profile === profileId && waypointsRef.current.length >= 2) {
+            postSlotRouteRequest(idx, waypointsRef.current, fallback, avoidAreasRef.current, 0);
+          }
+        });
+      }
+    },
+    [postSlotRouteRequest, saveToUrlAndStorage],
+  );
+
   const primarySlot = slots[0] || {
     profile: PROFILE_ORDER[0],
     alternativeIdx: 0,
@@ -1014,6 +1197,12 @@ export function useRouting(isOfflineMode: boolean) {
     setSlotProfile,
     setSlotColor,
     selectSlotAlternative,
+    customProfiles,
+    customProfileError,
+    getProfileMeta,
+    updateCustomProfileDsl,
+    saveCustomProfile,
+    deleteCustomProfile,
     profile: primarySlot.profile,
     setProfile,
     waypoints,
@@ -1031,6 +1220,7 @@ export function useRouting(isOfflineMode: boolean) {
     canRedo,
     fitBoundsSeq,
     triggerFitBounds,
+    inspectPoint,
     importGpxContent,
     importGpxFile,
     addWaypoint,

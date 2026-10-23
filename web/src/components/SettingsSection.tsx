@@ -12,8 +12,6 @@ interface SettingsSectionProps {
   onChangeUnits: (units: Units) => void;
   theme: Theme;
   onChangeTheme: (theme: Theme) => void;
-  thunderforestKey: string;
-  onChangeThunderforestKey: (key: string) => void;
   isOfflineMode: boolean;
   onToggleOfflineMode: (enabled: boolean) => void;
   bundleStatus: OfflineBundleStatus;
@@ -32,8 +30,6 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   onChangeUnits,
   theme,
   onChangeTheme,
-  thunderforestKey,
-  onChangeThunderforestKey,
   isOfflineMode,
   onToggleOfflineMode,
   bundleStatus,
@@ -80,7 +76,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
               <Icon name="settings" size={18} />
               <span>Settings</span>
             </h2>
-            <p>Display preferences, offline routing data, and map keys.</p>
+            <p>Display preferences and offline routing data.</p>
           </div>
           <button
             id="btn-close-settings"
@@ -242,30 +238,6 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                 </button>
               </div>
             </div>
-          </div>
-
-          <div className="field">
-            <label htmlFor="input-thunderforest-key">Thunderforest API Key (optional)</label>
-            <input
-              type="text"
-              id="input-thunderforest-key"
-              placeholder="Default key active"
-              autoComplete="off"
-              spellCheck="false"
-              value={thunderforestKey}
-              onChange={(e) => onChangeThunderforestKey(e.target.value)}
-            />
-            <small className="field-hint">
-              Default key active for OpenCycleMap. Supply your own key from{' '}
-              <a
-                href="https://www.thunderforest.com/"
-                target="_blank"
-                rel="noopener"
-              >
-                thunderforest.com
-              </a>
-              .
-            </small>
           </div>
         </div>
       </div>

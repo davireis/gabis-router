@@ -2,16 +2,14 @@ import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import type { Profile } from '../utils/geo.ts';
 import { formatDistance, formatElevation, type Units } from '../format.ts';
 import {
-  classifySurface,
+  classifySurfaceSubclass,
   classifyRoad,
   classifyTraffic,
   classifyNoise,
-  classifySpeedLimit,
-  SURFACE_META,
+  SURFACE_SUB_META,
   ROAD_META,
   TRAFFIC_META,
   NOISE_META,
-  SPEED_LIMIT_META,
 } from '../utils/classification.ts';
 import { gradeAt, gradeColor, nearestIndex, nearestVertex } from '../utils/geo.ts';
 
@@ -44,7 +42,6 @@ interface HoverDetails {
   trafficLabel: string;
   trafficColor: string;
   noiseLabel: string;
-  speedLimitLabel: string;
 }
 
 export const ElevationChart: React.FC<ElevationChartProps> = ({
@@ -111,7 +108,6 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
           trafficLabel: '',
           trafficColor: '#94a3b8',
           noiseLabel: '',
-          speedLimitLabel: '',
         };
       }
       let target = segments[segments.length - 1];
@@ -121,21 +117,18 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
           break;
         }
       }
-      const sCat = classifySurface(target.surface, target.highway);
+      const sCat = classifySurfaceSubclass(target.surface, target.highway);
       const rCat = classifyRoad(target.highway);
       const tCat = classifyTraffic(target.traffic, target.highway);
       const nCat = classifyNoise(target.noise);
-      const spCat = classifySpeedLimit(target.maxspeed, target.highway);
-      const rawSurf = target.surface ? ` (${target.surface})` : '';
       return {
-        surfLabel: `${SURFACE_META[sCat].label}${rawSurf}`,
-        surfColor: SURFACE_META[sCat].color,
+        surfLabel: SURFACE_SUB_META[sCat].label,
+        surfColor: SURFACE_SUB_META[sCat].color,
         roadLabel: ROAD_META[rCat].label,
         roadColor: ROAD_META[rCat].color,
         trafficLabel: `Traffic: ${TRAFFIC_META[tCat].label}`,
         trafficColor: TRAFFIC_META[tCat].color,
         noiseLabel: `Noise: ${NOISE_META[nCat].label}`,
-        speedLimitLabel: SPEED_LIMIT_META[spCat].label,
       };
     },
     [segments],
@@ -294,7 +287,6 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
                   {hoverState.trafficLabel}
                 </span>
                 <span className="ec-tag">{hoverState.noiseLabel}</span>
-                <span className="ec-tag">{hoverState.speedLimitLabel}</span>
               </span>
             )}
           </div>

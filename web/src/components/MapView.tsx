@@ -9,6 +9,7 @@ import {
   waypointLabel,
   type AvoidArea,
   type LatLon,
+  type PointWayInfo,
   type RouteSlotState,
 } from '../types.ts';
 import type { Basemap } from '../basemap.ts';
@@ -27,8 +28,16 @@ import { legendControl } from '../legend-control.ts';
 import { loadedPMTiles, archivesReady } from '../hooks/useOffline.ts';
 import { CYCLE_ROUTES_ARCHIVE, MAP_TILES_CACHE_NAME, segmentsForTile } from '../segment-cache.ts';
 import { getMapTileDownloadUrl } from '../platform.ts';
-import { showMenu, hideMenu, menuClosedWithin, updateMenuHeader, type MenuItem } from '../menu.ts';
+import {
+  showMenu,
+  hideMenu,
+  menuClosedWithin,
+  updateMenuHeader,
+  appendMenuTags,
+  type MenuItem,
+} from '../menu.ts';
 import { getCachedPlaceName, reverseGeocode } from '../geocoding.ts';
+import { formatPointWayTags, summarizeVectorFeatures } from '../utils/feature-info.ts';
 import { distanceMeters, legIndexAt, nearestVertex } from '../utils/geo.ts';
 import {
   syncAvoidAreasLayer,
@@ -196,6 +205,11 @@ interface MapViewProps {
   onUpdateAvoidAreaRadius: (index: number, radius: number) => void;
   onRemoveAvoidArea: (index: number) => void;
   onHoverPosition?: (pos: { lat: number; lon: number } | null) => void;
+  onInspectPoint?: (
+    lon: number,
+    lat: number,
+    maxDistanceM?: number,
+  ) => Promise<PointWayInfo | null>;
   onStatusChange: (status: string) => void;
   onMapInstance?: (map: maplibregl.Map) => void;
 }
@@ -220,6 +234,7 @@ export const MapView: React.FC<MapViewProps> = ({
   onUpdateAvoidAreaRadius,
   onRemoveAvoidArea,
   onHoverPosition,
+  onInspectPoint,
   onStatusChange,
   onMapInstance,
 }) => {
@@ -258,6 +273,8 @@ export const MapView: React.FC<MapViewProps> = ({
   onRemoveAvoidAreaRef.current = onRemoveAvoidArea;
   const onHoverPositionRef = useRef(onHoverPosition);
   onHoverPositionRef.current = onHoverPosition;
+  const onInspectPointRef = useRef(onInspectPoint);
+  onInspectPointRef.current = onInspectPoint;
   const onStatusChangeRef = useRef(onStatusChange);
   onStatusChangeRef.current = onStatusChange;
   const onMapInstanceRef = useRef(onMapInstance);
@@ -350,7 +367,7 @@ export const MapView: React.FC<MapViewProps> = ({
     });
 
     map.on('styleimagemissing', (e) => {
-      if (e.id.startsWith('cycle-shield-')) {
+      if (e.id.startsWith('cycle-shield-') || e.id.startsWith('scenery-pattern-')) {
         registerCycleShieldImages(map);
         return;
       }
@@ -409,12 +426,36 @@ export const MapView: React.FC<MapViewProps> = ({
       );
     };
 
-    const showMapContextMenu = (p: LatLon, x: number, y: number) => {
+    const inspectFeaturesAt = (screenPoint?: { x: number; y: number }) => {
+      if (!screenPoint) return {};
+      try {
+        const r = 6;
+        const bbox: [[number, number], [number, number]] = [
+          [screenPoint.x - r, screenPoint.y - r],
+          [screenPoint.x + r, screenPoint.y + r],
+        ];
+        const rendered = map.queryRenderedFeatures(bbox);
+        return summarizeVectorFeatures(rendered);
+      } catch {
+        return {};
+      }
+    };
+
+    const showMapContextMenu = (
+      p: LatLon,
+      x: number,
+      y: number,
+      screenPoint?: { x: number; y: number },
+    ) => {
       lastOpenedMarkerIndexRef.current = null;
       const wps = waypointsRef.current;
+      const featureInfo = inspectFeaturesAt(screenPoint);
       let resolvedName = getCachedPlaceName(p.lat, p.lon);
       const coordHeader = `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
-      const pointWithCachedName = (): LatLon => (resolvedName ? { ...p, name: resolvedName } : p);
+      const pointWithCachedName = (): LatLon => {
+        const bestName = resolvedName || featureInfo.primaryName;
+        return bestName ? { ...p, name: bestName } : p;
+      };
 
       const items: MenuItem[] = [
         {
@@ -465,7 +506,17 @@ export const MapView: React.FC<MapViewProps> = ({
         },
       );
 
-      const session = showMenu(items, x, y, resolvedName || coordHeader);
+      const session = showMenu(items, x, y, {
+        title: resolvedName || coordHeader,
+        subtitle:
+          resolvedName &&
+          featureInfo.subtitle &&
+          resolvedName.toLowerCase().includes(featureInfo.subtitle.toLowerCase())
+            ? undefined
+            : featureInfo.subtitle,
+        badges: featureInfo.badges,
+        tags: featureInfo.tags,
+      });
 
       if (!resolvedName) {
         reverseGeocode(p.lat, p.lon).then((name) => {
@@ -475,6 +526,13 @@ export const MapView: React.FC<MapViewProps> = ({
           }
         });
       }
+
+      onInspectPointRef.current?.(p.lon, p.lat)?.then((wayInfo) => {
+        const extraTags = formatPointWayTags(wayInfo, featureInfo.tags);
+        if (extraTags.length > 0) {
+          appendMenuTags(extraTags, session);
+        }
+      });
     };
 
     const showAvoidContextMenu = (index: number, x: number, y: number) => {
@@ -534,7 +592,7 @@ export const MapView: React.FC<MapViewProps> = ({
         if (avoidIdx !== -1) {
           showAvoidContextMenu(avoidIdx, e.originalEvent.clientX, e.originalEvent.clientY);
         } else {
-          showMapContextMenu(p, e.originalEvent.clientX, e.originalEvent.clientY);
+          showMapContextMenu(p, e.originalEvent.clientX, e.originalEvent.clientY, e.point);
         }
       }, 220);
     });
@@ -552,7 +610,7 @@ export const MapView: React.FC<MapViewProps> = ({
       if (avoidIdx !== -1) {
         showAvoidContextMenu(avoidIdx, e.originalEvent.clientX, e.originalEvent.clientY);
       } else {
-        showMapContextMenu(p, e.originalEvent.clientX, e.originalEvent.clientY);
+        showMapContextMenu(p, e.originalEvent.clientX, e.originalEvent.clientY, e.point);
       }
     });
 
@@ -588,7 +646,7 @@ export const MapView: React.FC<MapViewProps> = ({
         if (avoidIdx !== -1) {
           showAvoidContextMenu(avoidIdx, touch.clientX, touch.clientY);
         } else {
-          showMapContextMenu(p, touch.clientX, touch.clientY);
+          showMapContextMenu(p, touch.clientX, touch.clientY, e.point);
         }
       }, LONG_PRESS_MS);
     });

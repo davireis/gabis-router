@@ -4,6 +4,7 @@ import { Icon } from './common/Icon.tsx';
 
 interface HeaderProps {
   profile: ProfileName;
+  profileLabel?: string;
   compareCount?: number;
   isOfflineMode?: boolean;
   isCollapsed: boolean;
@@ -14,6 +15,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   profile,
+  profileLabel,
   compareCount = 0,
   isOfflineMode,
   isCollapsed,
@@ -22,7 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAbout,
 }) => {
   const profileMeta = PROFILE_INFO[profile];
-  const badgeLabel = `${profileMeta?.shortLabel || profile}${compareCount > 0 ? ` +${compareCount}` : ''}`;
+  const badgeLabel = `${profileLabel || profileMeta?.shortLabel || profile}${compareCount > 0 ? ` +${compareCount}` : ''}`;
 
   return (
     <div

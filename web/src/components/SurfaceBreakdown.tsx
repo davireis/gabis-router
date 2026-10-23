@@ -4,14 +4,22 @@ import { nearestIndex } from '../utils/geo.ts';
 import type { SegmentHighlight, SegmentData } from '../utils/classification.ts';
 import {
   classifySurface,
+  classifySurfaceSubclass,
+  classifyRoadGroup,
   classifyRoad,
   classifyTraffic,
+  classifyTrafficSubclass,
   classifyNoise,
+  classifyNoiseSubclass,
   classifySpeedLimit,
   SURFACE_META,
+  SURFACE_SUB_META,
+  ROAD_GROUP_META,
   ROAD_META,
   TRAFFIC_META,
+  TRAFFIC_SUB_META,
   NOISE_META,
+  NOISE_SUB_META,
   SPEED_LIMIT_META,
 } from '../utils/classification.ts';
 import { formatDistance, type Units } from '../format.ts';
@@ -26,7 +34,7 @@ interface SurfaceBreakdownProps {
   onHighlightSegment: (highlight: SegmentHighlight | null) => void;
 }
 
-interface StackedBarProps<T extends string> {
+interface StackedBarProps<T extends string, S extends string = T> {
   rowKey: string;
   title: string;
   tooltip: string;
@@ -35,6 +43,8 @@ interface StackedBarProps<T extends string> {
   segments: SegmentData[];
   classifier: (s: SegmentData) => T;
   meta: Record<T, { label: string; color: string }>;
+  subClassifier?: (s: SegmentData) => S;
+  subMeta?: Record<S, { label: string; parent: T; color: string }>;
   profile: Profile | null;
   pinnedKey: string | null;
   onTogglePin: (key: string, highlight: SegmentHighlight) => void;
@@ -42,7 +52,7 @@ interface StackedBarProps<T extends string> {
   onHighlightSegment: (highlight: SegmentHighlight | null) => void;
 }
 
-function StackedBarRow<T extends string>({
+function StackedBarRow<T extends string, S extends string = T>({
   rowKey,
   title,
   tooltip,
@@ -51,30 +61,46 @@ function StackedBarRow<T extends string>({
   segments,
   classifier,
   meta,
+  subClassifier,
+  subMeta,
   profile,
   pinnedKey,
   onTogglePin,
   onHover,
   onHighlightSegment,
-}: StackedBarProps<T>) {
-  const { merged, categoryTotals } = useMemo(() => {
+}: StackedBarProps<T, S>) {
+  const { merged, categoryTotals, subMerged, subTotals } = useMemo(() => {
     const totals: Partial<Record<T, number>> = {};
-    const m: Array<{ from: number; to: number; category: T }> = [];
+    const sTotals: Partial<Record<S, number>> = {};
+    const m: Array<{ from: number; to: number; category: T; subCategory?: S }> = [];
+    const sm: Array<{ from: number; to: number; subCategory: S }> = [];
 
     for (const s of segments) {
       const len = Math.max(0, s.to - s.from);
       if (len === 0) continue;
       const cat = classifier(s);
+      const subCat = subClassifier ? subClassifier(s) : undefined;
       totals[cat] = (totals[cat] || 0) + len;
+      if (subCat !== undefined) {
+        sTotals[subCat] = (sTotals[subCat] || 0) + len;
+      }
 
       if (m.length > 0 && m[m.length - 1].category === cat) {
         m[m.length - 1].to = s.to;
       } else {
-        m.push({ from: s.from, to: s.to, category: cat });
+        m.push({ from: s.from, to: s.to, category: cat, subCategory: subCat });
+      }
+
+      if (subCat !== undefined) {
+        if (sm.length > 0 && sm[sm.length - 1].subCategory === subCat) {
+          sm[sm.length - 1].to = s.to;
+        } else {
+          sm.push({ from: s.from, to: s.to, subCategory: subCat });
+        }
       }
     }
-    return { merged: m, categoryTotals: totals };
-  }, [segments, classifier]);
+    return { merged: m, categoryTotals: totals, subMerged: sm, subTotals: sTotals };
+  }, [segments, classifier, subClassifier]);
 
   const segmentCoordinates = useCallback(
     (fromM: number, toM: number): number[][] => {
@@ -112,6 +138,25 @@ function StackedBarRow<T extends string>({
     [merged, meta, segmentCoordinates],
   );
 
+  const buildSubCategoryHighlight = useCallback(
+    (subCat: S): SegmentHighlight | null => {
+      if (!subMeta) return null;
+      const allCoords: number[][][] = [];
+      for (const s of subMerged) {
+        if (s.subCategory === subCat) {
+          const c = segmentCoordinates(s.from, s.to);
+          if (c.length >= 2) allCoords.push(c);
+        }
+      }
+      if (allCoords.length === 0) return null;
+      return {
+        coordinates: allCoords,
+        color: subMeta[subCat].color,
+      };
+    },
+    [subMerged, subMeta, segmentCoordinates],
+  );
+
   const handleBarPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!profile) return;
     const box = e.currentTarget.getBoundingClientRect();
@@ -127,6 +172,24 @@ function StackedBarRow<T extends string>({
   };
 
   const cats = (Object.keys(meta) as T[]).filter((c) => (categoryTotals[c] || 0) > 0);
+  const allSubKeys = subMeta ? (Object.keys(subMeta) as S[]) : [];
+
+  // Determine which parent class is currently expanded (via pinned class or pinned subclass)
+  let expandedParent: T | null = null;
+  if (subMeta && pinnedKey && pinnedKey.startsWith(`${rowKey}:`)) {
+    const rest = pinnedKey.slice(rowKey.length + 1);
+    if (rest.startsWith('sub:')) {
+      const subKey = rest.slice(4) as S;
+      if (subMeta[subKey]) expandedParent = subMeta[subKey].parent;
+    } else if (meta[rest as T]) {
+      expandedParent = rest as T;
+    }
+  }
+
+  const expandedSubCats =
+    subMeta && expandedParent
+      ? allSubKeys.filter((sk) => subMeta[sk].parent === expandedParent && (subTotals[sk] || 0) > 0)
+      : [];
 
   return (
     <div className="profile-bar-row">
@@ -140,7 +203,17 @@ function StackedBarRow<T extends string>({
             const pct = Math.round((dist / totalDist) * 100);
             if (pct < 1 && dist < 100) return null;
             const itemKey = `${rowKey}:${cat}`;
-            const isPinned = pinnedKey === itemKey;
+            const isPinned = pinnedKey === itemKey || expandedParent === cat;
+            const childSubs = subMeta
+              ? allSubKeys
+                  .filter((sk) => subMeta[sk].parent === cat && (subTotals[sk] || 0) > 0)
+                  .map((sk) => {
+                    const sd = subTotals[sk] || 0;
+                    const sp = Math.round((sd / totalDist) * 100);
+                    return `${subMeta[sk].label} ${sp}%`;
+                  })
+                  .join(', ')
+              : '';
 
             return (
               <span
@@ -148,7 +221,7 @@ function StackedBarRow<T extends string>({
                 role="button"
                 tabIndex={0}
                 className={`surface-legend-item ${isPinned ? 'active' : ''}`}
-                title={`${meta[cat].label}: ${formatDistance(dist)} (${pct}%) - Click to pin on map`}
+                title={`${meta[cat].label}: ${formatDistance(dist)} (${pct}%)${childSubs ? ` — ${childSubs}` : ''} (Click to ${subMeta ? 'inspect subclasses & ' : ''}pin on map)`}
                 onPointerEnter={() => {
                   const hl = buildCategoryHighlight(cat);
                   if (hl) onHighlightSegment(hl);
@@ -183,6 +256,8 @@ function StackedBarRow<T extends string>({
       >
         {merged.map((seg, i) => {
           const widthPct = Math.max(0.1, ((seg.to - seg.from) / totalDist) * 100);
+          const subLabel =
+            subMeta && seg.subCategory !== undefined ? ` › ${subMeta[seg.subCategory].label}` : '';
           return (
             <div
               key={i}
@@ -191,7 +266,7 @@ function StackedBarRow<T extends string>({
                 width: `${widthPct.toFixed(2)}%`,
                 backgroundColor: meta[seg.category].color,
               }}
-              title={`${meta[seg.category].label}: ${formatDistance(seg.to - seg.from)}`}
+              title={`${meta[seg.category].label}${subLabel}: ${formatDistance(seg.to - seg.from)}`}
               onPointerEnter={() => {
                 const coords = segmentCoordinates(seg.from, seg.to);
                 if (coords.length >= 2) {
@@ -205,6 +280,46 @@ function StackedBarRow<T extends string>({
           );
         })}
       </div>
+
+      {subMeta && expandedParent && expandedSubCats.length > 0 && (
+        <div className="surface-subclass-row" role="group" aria-label={`${meta[expandedParent].label} subclasses`}>
+          <span className="surface-subclass-label">{meta[expandedParent].label}:</span>
+          {expandedSubCats.map((subCat) => {
+            const dist = subTotals[subCat] || 0;
+            const pct = Math.max(1, Math.round((dist / totalDist) * 100));
+            const subItemKey = `${rowKey}:sub:${subCat}`;
+            const isSubPinned = pinnedKey === subItemKey;
+            return (
+              <span
+                key={subCat}
+                role="button"
+                tabIndex={0}
+                className={`surface-legend-item surface-subclass-item ${isSubPinned ? 'active' : ''}`}
+                title={`${subMeta[subCat].label}: ${formatDistance(dist)} (${pct}%) — Click to pin subclass on map`}
+                onPointerEnter={() => {
+                  const hl = buildSubCategoryHighlight(subCat);
+                  if (hl) onHighlightSegment(hl);
+                }}
+                onPointerLeave={() => onHighlightSegment(null)}
+                onClick={() => {
+                  const hl = buildSubCategoryHighlight(subCat);
+                  if (hl) onTogglePin(subItemKey, hl);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    const hl = buildSubCategoryHighlight(subCat);
+                    if (hl) onTogglePin(subItemKey, hl);
+                  }
+                }}
+              >
+                <span className="surface-swatch" style={{ backgroundColor: subMeta[subCat].color }}></span>
+                <span>{`${subMeta[subCat].label} ${formatDistance(dist)} (${pct}%)`}</span>
+              </span>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -257,12 +372,14 @@ export const SurfaceBreakdown: React.FC<SurfaceBreakdownProps> = ({
       <StackedBarRow
         rowKey="surface"
         title="Surface"
-        tooltip="Road surface material from OpenStreetMap. Click any category to pin its segments on the map."
+        tooltip="OpenStreetMap surface=* classes. Click any class chip below to expand its individual OSM surface=* subclasses."
         ariaLabel="Surface types"
         totalDist={total}
         segments={segments}
         classifier={(s) => classifySurface(s.surface, s.highway)}
         meta={SURFACE_META}
+        subClassifier={(s) => classifySurfaceSubclass(s.surface, s.highway)}
+        subMeta={SURFACE_SUB_META}
         profile={profile}
         pinnedKey={pinned?.key ?? null}
         onTogglePin={handleTogglePin}
@@ -272,12 +389,14 @@ export const SurfaceBreakdown: React.FC<SurfaceBreakdownProps> = ({
       <StackedBarRow
         rowKey="road"
         title="Road Type"
-        tooltip="Highway classification from OpenStreetMap. Separates protected cycleways and quiet residential streets from major roads."
+        tooltip="OpenStreetMap highway=* classes grouped into Cycleways & Paths, Tracks, Quiet & Minor Roads, Main Roads, and Arterial Roads. Click any class chip below to expand its individual highway=* subclasses."
         ariaLabel="Road types"
         totalDist={total}
         segments={segments}
-        classifier={(s) => classifyRoad(s.highway)}
-        meta={ROAD_META}
+        classifier={(s) => classifyRoadGroup(s.highway)}
+        meta={ROAD_GROUP_META}
+        subClassifier={(s) => classifyRoad(s.highway)}
+        subMeta={ROAD_META}
         profile={profile}
         pinnedKey={pinned?.key ?? null}
         onTogglePin={handleTogglePin}
@@ -287,12 +406,14 @@ export const SurfaceBreakdown: React.FC<SurfaceBreakdownProps> = ({
       <StackedBarRow
         rowKey="traffic"
         title="Traffic"
-        tooltip="Estimated motor vehicle volume based on road classification and BRouter traffic density tags."
+        tooltip="Estimated motor vehicle volume from BRouter estimated_traffic_class=1..6 and OSM highway=* hierarchy. Click any class chip below to expand its individual traffic subclasses."
         ariaLabel="Traffic levels"
         totalDist={total}
         segments={segments}
         classifier={(s) => classifyTraffic(s.traffic, s.highway)}
         meta={TRAFFIC_META}
+        subClassifier={(s) => classifyTrafficSubclass(s.traffic, s.highway)}
+        subMeta={TRAFFIC_SUB_META}
         profile={profile}
         pinnedKey={pinned?.key ?? null}
         onTogglePin={handleTogglePin}
@@ -302,12 +423,14 @@ export const SurfaceBreakdown: React.FC<SurfaceBreakdownProps> = ({
       <StackedBarRow
         rowKey="noise"
         title="Noise &amp; pollution"
-        tooltip="Modeled noise and air pollution exposure based on proximity to motorways, trunk roads, primary roads, and flight paths."
+        tooltip="Modeled noise and air pollution exposure from BRouter estimated_noise_class=1..6. Click any class chip below to expand its individual noise subclasses."
         ariaLabel="Noise and pollution levels"
         totalDist={total}
         segments={segments}
         classifier={(s) => classifyNoise(s.noise)}
         meta={NOISE_META}
+        subClassifier={(s) => classifyNoiseSubclass(s.noise)}
+        subMeta={NOISE_SUB_META}
         profile={profile}
         pinnedKey={pinned?.key ?? null}
         onTogglePin={handleTogglePin}

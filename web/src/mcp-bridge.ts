@@ -6,7 +6,6 @@ import type { useSettings } from './hooks/useSettings.ts';
 import {
   classifyNoise,
   classifyRoad,
-  classifySpeedLimit,
   classifySurface,
   classifyTraffic,
   ROAD_META,
@@ -27,6 +26,8 @@ import { getOfflineStyle, getOnlineStyle } from './utils/map-styles.ts';
 export interface McpUiControls {
   isControlsCollapsed: boolean;
   setIsControlsCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
+  isProfileEditorOpen: boolean;
+  setIsProfileEditorOpen: React.Dispatch<React.SetStateAction<boolean>>;
   isRouteInfoCollapsed: boolean;
   setIsRouteInfoCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
   isSettingsOpen: boolean;
@@ -73,7 +74,6 @@ function summarizeRoute(currentRoute: GeoJSON.FeatureCollection | null, slotIdx 
   const roadMeters: Record<string, number> = {};
   const trafficMeters: Record<string, number> = {};
   const noiseMeters: Record<string, number> = {};
-  const speedLimitMeters: Record<string, number> = {};
 
   for (const s of segs) {
     const len = Math.max(0, s.to - s.from);
@@ -82,12 +82,10 @@ function summarizeRoute(currentRoute: GeoJSON.FeatureCollection | null, slotIdx 
     const road = classifyRoad(s.highway);
     const traf = classifyTraffic(s.traffic, s.highway);
     const noise = classifyNoise(s.noise);
-    const spd = classifySpeedLimit(s.maxspeed, s.highway);
     surfaceMeters[surf] = (surfaceMeters[surf] || 0) + len;
     roadMeters[road] = (roadMeters[road] || 0) + len;
     trafficMeters[traf] = (trafficMeters[traf] || 0) + len;
     noiseMeters[noise] = (noiseMeters[noise] || 0) + len;
-    speedLimitMeters[spd] = (speedLimitMeters[spd] || 0) + len;
   }
 
   const textOf = (baseId: string) => {
@@ -107,7 +105,6 @@ function summarizeRoute(currentRoute: GeoJSON.FeatureCollection | null, slotIdx 
     roadBreakdownMeters: roadMeters,
     trafficBreakdownMeters: trafficMeters,
     noiseBreakdownMeters: noiseMeters,
-    speedLimitBreakdownMeters: speedLimitMeters,
     displayedStats: {
       distance: textOf('ri-distance'),
       time: textOf('ri-time'),
@@ -151,6 +148,7 @@ function buildStateSnapshot(ctx: McpBridgeContext) {
     routeSummary: summarizeRoute(ctx.routing.currentRoute, 0),
     ui: {
       isControlsCollapsed: ctx.ui.isControlsCollapsed,
+      isProfileEditorOpen: ctx.ui.isProfileEditorOpen,
       isRouteInfoCollapsed: ctx.ui.isRouteInfoCollapsed,
       isSettingsOpen: ctx.ui.isSettingsOpen,
       isAboutOpen: ctx.ui.isAboutOpen,
@@ -407,6 +405,8 @@ function syncFormStateToClone(origRoot: Element, cloneRoot: Element) {
         if (idx === orig.selectedIndex) opt.setAttribute('selected', 'selected');
         else opt.removeAttribute('selected');
       });
+    } else if (orig instanceof HTMLTextAreaElement && clone instanceof HTMLTextAreaElement) {
+      clone.textContent = orig.value;
     } else if (orig instanceof HTMLDetailsElement && clone instanceof HTMLDetailsElement) {
       if (orig.open) clone.setAttribute('open', '');
       else clone.removeAttribute('open');
@@ -675,6 +675,37 @@ async function handleMcpCommand(payload: {
             typeof args.collapsed === 'boolean' ? args.collapsed : !prev,
           );
           break;
+        case 'toggle_profile_editor':
+          cur.ui.setIsProfileEditorOpen((prev) =>
+            typeof args.open === 'boolean' ? args.open : !prev,
+          );
+          waitsForRoute = true;
+          break;
+        case 'set_input_value': {
+          const el = document.querySelector(String(args.selector)) as
+            | HTMLInputElement
+            | HTMLSelectElement
+            | HTMLTextAreaElement
+            | null;
+          if (!el) throw new Error(`Element not found for selector: ${args.selector}`);
+          const proto =
+            el instanceof HTMLSelectElement
+              ? window.HTMLSelectElement.prototype
+              : el instanceof HTMLTextAreaElement
+              ? window.HTMLTextAreaElement.prototype
+              : window.HTMLInputElement.prototype;
+          const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+          if (nativeSetter) {
+            nativeSetter.call(el, String(args.value));
+          } else {
+            el.value = String(args.value);
+          }
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          await sleep(180);
+          waitsForRoute = true;
+          break;
+        }
         case 'toggle_route_info':
           cur.ui.setIsRouteInfoCollapsed((prev) =>
             typeof args.collapsed === 'boolean' ? args.collapsed : !prev,

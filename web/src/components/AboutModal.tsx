@@ -75,9 +75,6 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
               server to run. It also puts the nerdy details at the centre: surfaces, road types, traffic, speed limits,
               and noise estimates. It is designed for cyclists who want to tweak their route until it feels right.
             </p>
-            <p style={{ marginTop: '8px', fontStyle: 'italic', color: 'var(--muted)' }}>
-              Visual profile editing without writing DSL code is coming soon.
-            </p>
           </div>
 
           <div>

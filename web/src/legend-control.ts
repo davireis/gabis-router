@@ -163,6 +163,16 @@ export class LegendControl implements maplibregl.IControl {
           <span class="map-legend-label">MTB Route</span>
           <span class="map-legend-badge" style="background:#ca8a04">M</span>
         </div>
+        <div class="map-legend-row">
+          <span class="map-legend-swatch">
+            <svg width="34" height="12" viewBox="0 0 34 12">
+              <line x1="2" y1="6" x2="32" y2="6" stroke="#22c55e" stroke-width="6" stroke-linecap="round" />
+              <line x1="2" y1="6" x2="32" y2="6" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+          </span>
+          <span class="map-legend-label">Proposed Route</span>
+          <span class="map-legend-badge" style="background:#15803d">P</span>
+        </div>
       </div>
       <div class="map-legend-section">
         <div class="map-legend-section-title">Paths &amp; Terrain</div>
@@ -206,6 +216,36 @@ export class LegendControl implements maplibregl.IControl {
         </div>`
             : ''
         }
+        <div class="map-legend-row">
+          <span class="map-legend-swatch">
+            <svg width="34" height="12" viewBox="0 0 34 12">
+              <rect x="2" y="2" width="14" height="8" rx="1.5" fill="#78be64" fill-opacity="0.72" stroke="#2d6624" stroke-opacity="0.35" stroke-width="0.8" />
+              <circle cx="9" cy="5.5" r="2" fill="#22622a" fill-opacity="0.45" />
+              <rect x="18" y="2" width="14" height="8" rx="1.5" fill="#cce6b8" fill-opacity="0.82" />
+            </svg>
+          </span>
+          <span class="map-legend-label">Woodland / Meadow</span>
+        </div>
+        <div class="map-legend-row">
+          <span class="map-legend-swatch">
+            <svg width="34" height="12" viewBox="0 0 34 12">
+              <rect x="2" y="2" width="14" height="8" rx="1.5" fill="#e7ddb8" fill-opacity="0.85" stroke="#a28a58" stroke-opacity="0.4" stroke-width="0.8" />
+              <rect x="18" y="2" width="14" height="8" rx="1.5" fill="#ddd0b1" fill-opacity="0.88" />
+            </svg>
+          </span>
+          <span class="map-legend-label">Farmland / Heath</span>
+        </div>
+        <div class="map-legend-row">
+          <span class="map-legend-swatch">
+            <svg width="34" height="12" viewBox="0 0 34 12">
+              <rect x="2" y="2" width="14" height="8" rx="1.5" fill="#f2d89c" stroke="#b4883c" stroke-opacity="0.45" stroke-width="0.8" />
+              <circle cx="6" cy="5" r="0.8" fill="#9c6a26" fill-opacity="0.6" />
+              <circle cx="11" cy="7" r="0.8" fill="#9c6a26" fill-opacity="0.6" />
+              <rect x="18" y="2" width="14" height="8" rx="1.5" fill="#99dcd0" fill-opacity="0.65" />
+            </svg>
+          </span>
+          <span class="map-legend-label">Sand / Wetland</span>
+        </div>
       </div>
     `;
 

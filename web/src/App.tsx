@@ -27,6 +27,7 @@ export const App: React.FC = () => {
   // Responsive drawer states
   const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches;
   const [isControlsCollapsed, setIsControlsCollapsed] = useState<boolean>(false);
+  const [isProfileEditorOpen, setIsProfileEditorOpen] = useState<boolean>(false);
   const [isRouteInfoCollapsed, setIsRouteInfoCollapsed] = useState<boolean>(isMobile);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
@@ -111,6 +112,8 @@ export const App: React.FC = () => {
     ui: {
       isControlsCollapsed,
       setIsControlsCollapsed,
+      isProfileEditorOpen,
+      setIsProfileEditorOpen,
       isRouteInfoCollapsed,
       setIsRouteInfoCollapsed,
       isSettingsOpen,
@@ -139,6 +142,11 @@ export const App: React.FC = () => {
             return next;
           });
         }}
+        isProfileEditorOpen={isProfileEditorOpen}
+        onToggleProfileEditor={() => {
+          setIsProfileEditorOpen((prev) => !prev);
+          setIsControlsCollapsed(false);
+        }}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenAbout={() => setIsAboutOpen(true)}
         getMapCenter={getMapCenter}
@@ -149,6 +157,7 @@ export const App: React.FC = () => {
 
       <RouteInfoDrawer
         slots={routing.slots}
+        getProfileMeta={routing.getProfileMeta}
         units={settings.units}
         onSelectSlotAlternative={routing.selectSlotAlternative}
         onRemoveSlot={routing.removeProfileSlot}
@@ -187,6 +196,7 @@ export const App: React.FC = () => {
         onRemoveAvoidArea={routing.removeAvoidArea}
         onUpdateAvoidAreaRadius={routing.updateAvoidAreaRadius}
         onHoverPosition={setHoverPosition}
+        onInspectPoint={routing.inspectPoint}
         onStatusChange={routing.setStatus}
         onMapInstance={handleMapInstance}
       />
@@ -198,8 +208,6 @@ export const App: React.FC = () => {
         onChangeUnits={settings.changeUnits}
         theme={settings.theme}
         onChangeTheme={settings.changeTheme}
-        thunderforestKey={settings.thunderforestKey}
-        onChangeThunderforestKey={settings.changeThunderforestKey}
         isOfflineMode={offline.isOfflineMode}
         onToggleOfflineMode={offline.setOfflineMode}
         bundleStatus={offline.bundleStatus}

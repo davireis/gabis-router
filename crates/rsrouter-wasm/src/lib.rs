@@ -8,7 +8,10 @@ use brouter_rs::graph::routing_graph::RoutingGraph;
 use brouter_rs::rd5::rd5_slice::{LazyRd5Provider, Rd5SegmentReader};
 use brouter_rs::routing::nogo::{parse_lonlats, parse_nogos};
 use brouter_rs::routing::search::{AStarRouter, RouteRequest, RoutingOptions};
-use route_tools::{to_geojson_with_segments, GpxMatchRequest, MapMatchOptions, RouteMatcherExt};
+use route_tools::{
+    inspect_nearest_way, to_geojson_with_segments, GpxMatchRequest, MapMatchOptions,
+    RouteMatcherExt,
+};
 
 struct JsRd5SegmentReader {
     size_fn: js_sys::Function,
@@ -216,5 +219,21 @@ impl WasmRouter {
             "route": route_val,
         });
         Ok(out.to_string())
+    }
+
+    /// Inspects the nearest road or path edge within `max_distance_m` of `(lon, lat)`
+    /// and returns a JSON string of [`PointWayInfo`] (or `"null"` if no way is within range).
+    pub fn inspect_point(
+        &mut self,
+        lon: f64,
+        lat: f64,
+        max_distance_m: f64,
+    ) -> Result<String, JsValue> {
+        let Some(lookups) = &self.lookups else {
+            return Err(JsValue::from_str("Lookups not loaded"));
+        };
+        let info = inspect_nearest_way(&mut self.graph, lookups, lon, lat, max_distance_m);
+        serde_json::to_string(&info)
+            .map_err(|e| JsValue::from_str(&format!("Failed to serialize point info: {e}")))
     }
 }

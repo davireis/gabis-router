@@ -14,6 +14,7 @@ import { routeToGpx, downloadGpxFile } from '../utils/gpx.ts';
 import { getShareableRouteUrl, isNativePlatform } from '../platform.ts';
 import { Header } from './Header.tsx';
 import { WaypointList } from './WaypointList.tsx';
+import { ProfileEditorPanel } from './ProfileEditorPanel.tsx';
 import { InfoButton } from './TooltipPopover.tsx';
 import { Icon } from './common/Icon.tsx';
 
@@ -22,6 +23,8 @@ interface ControlsPanelProps {
   offline: ReturnType<typeof useOffline>;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  isProfileEditorOpen: boolean;
+  onToggleProfileEditor: () => void;
   onOpenSettings: () => void;
   onOpenAbout: () => void;
   getMapCenter?: () => { lat: number; lon: number };
@@ -35,6 +38,8 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
   offline,
   isCollapsed,
   onToggleCollapse,
+  isProfileEditorOpen,
+  onToggleProfileEditor,
   onOpenSettings,
   onOpenAbout,
   getMapCenter,
@@ -153,113 +158,146 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
   const isBusy = routing.isRouting || offline.downloadProgress.active;
 
   return (
-    <div id="controls" ref={controlsRef} className={isCollapsed ? 'collapsed' : ''}>
-      <Header
-        profile={routing.profile}
-        compareCount={Math.max(0, routing.slots.length - 1)}
-        isOfflineMode={offline.isOfflineMode}
-        isCollapsed={isCollapsed}
-        onToggleCollapse={onToggleCollapse}
-        onOpenSettings={onOpenSettings}
-        onOpenAbout={onOpenAbout}
-      />
+    <div
+      id="controls"
+      ref={controlsRef}
+      className={`${isCollapsed ? 'collapsed' : ''} ${!isCollapsed && isProfileEditorOpen ? 'editor-open' : ''}`}
+    >
+      <div className="controls-main-col">
+        <Header
+          profile={routing.profile}
+          profileLabel={routing.getProfileMeta(routing.profile).shortLabel}
+          compareCount={Math.max(0, routing.slots.length - 1)}
+          isOfflineMode={offline.isOfflineMode}
+          isCollapsed={isCollapsed}
+          onToggleCollapse={onToggleCollapse}
+          onOpenSettings={onOpenSettings}
+          onOpenAbout={onOpenAbout}
+        />
 
-      <div className="route-section" ref={routeSectionRef}>
-        <div className="field profile-field">
-          <div className="profile-field-header">
-            <label htmlFor="profile-select" className="profile-header-label">
-              <span>{routing.slots.length > 1 ? 'Profiles' : 'Profile'}</span>
-              <InfoButton
-                tooltip={`${PROFILE_INFO[routing.profile]?.summary || ''} Profiles score every road segment by surface, traffic, hills, and cycle infrastructure. Add up to 3 profiles to compare routes side by side.`}
-                ariaLabel="About Routing Profiles"
-              />
-            </label>
-            {routing.slots.length < MAX_ROUTE_SLOTS && (
-              <button
-                id="btn-add-compare-profile"
-                type="button"
-                className="btn-toolbar-mini btn-add-profile"
-                title="Compare with another routing profile (up to 3)"
-                onClick={() => routing.addProfileSlot()}
-              >
-                <span>+ Compare</span>
-              </button>
-            )}
-          </div>
+        <div className="route-section" ref={routeSectionRef}>
+          <div className="field profile-field">
+            <div className="profile-field-header">
+              <label htmlFor="profile-select" className="profile-header-label">
+                <span>{routing.slots.length > 1 ? 'Profiles' : 'Profile'}</span>
+                <InfoButton
+                  tooltip={`${routing.getProfileMeta(routing.profile)?.summary || ''} Profiles score every road segment by surface, traffic, hills, and cycle infrastructure. Add up to 3 profiles to compare routes side by side.`}
+                  ariaLabel="About Routing Profiles"
+                />
+              </label>
+              <div className="profile-header-actions">
+                <button
+                  id="btn-open-profile-editor"
+                  type="button"
+                  className={`btn-toolbar-mini btn-edit-profile ${isProfileEditorOpen ? 'active' : ''}`}
+                  title={isProfileEditorOpen ? 'Close Profile Editor' : 'Open Profile Editor to customize or create profiles'}
+                  onClick={onToggleProfileEditor}
+                >
+                  <Icon name="sliders" size={11} />
+                  <span>{isProfileEditorOpen ? 'Close Editor' : 'Edit Profile'}</span>
+                </button>
+                {routing.slots.length < MAX_ROUTE_SLOTS && (
+                  <button
+                    id="btn-add-compare-profile"
+                    type="button"
+                    className="btn-toolbar-mini btn-add-profile"
+                    title="Compare with another routing profile (up to 3)"
+                    onClick={() => routing.addProfileSlot()}
+                  >
+                    <span>+ Compare</span>
+                  </button>
+                )}
+              </div>
+            </div>
 
-          <div className="profile-slots-list">
-            {routing.slots.map((slot, slotIdx) => {
-              const slotColor = getSlotColor(slot, slotIdx);
-              const isPickerOpen = openColorSlotIdx === slotIdx;
-              return (
-                <div key={slotIdx} className="profile-slot-row">
-                  <div className="profile-color-picker-wrap">
-                    <button
-                      type="button"
-                      className={`profile-slot-dot profile-slot-dot-btn ${isPickerOpen ? 'active' : ''}`}
-                      style={{ backgroundColor: slotColor.line }}
-                      title={`Route ${slotIdx + 1} colour: ${slotColor.name} (click to change)`}
-                      aria-label={`Change route ${slotIdx + 1} colour (${slotColor.name})`}
-                      aria-expanded={isPickerOpen}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenColorSlotIdx(isPickerOpen ? null : slotIdx);
-                      }}
-                    />
-                    {isPickerOpen && (
-                      <div className="profile-color-popover" role="menu" aria-label="Select route colour">
-                        {ROUTE_COLOR_PALETTE.map((c) => {
-                          const isSelected = c.id === slotColor.id;
-                          return (
-                            <button
-                              key={c.id}
-                              type="button"
-                              className={`profile-color-swatch ${isSelected ? 'selected' : ''}`}
-                              style={{ backgroundColor: c.line }}
-                              title={c.name}
-                              aria-label={c.name}
-                              aria-checked={isSelected}
-                              role="menuitemradio"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                routing.setSlotColor(slotIdx, c.id);
-                                setOpenColorSlotIdx(null);
-                              }}
-                            />
-                          );
-                        })}
-                      </div>
+            <div className="profile-slots-list">
+              {routing.slots.map((slot, slotIdx) => {
+                const slotColor = getSlotColor(slot, slotIdx);
+                const isPickerOpen = openColorSlotIdx === slotIdx;
+                const slotMeta = routing.getProfileMeta(slot.profile);
+                return (
+                  <div key={slotIdx} className="profile-slot-row">
+                    <div className="profile-color-picker-wrap">
+                      <button
+                        type="button"
+                        className={`profile-slot-dot profile-slot-dot-btn ${isPickerOpen ? 'active' : ''}`}
+                        style={{ backgroundColor: slotColor.line }}
+                        title={`Route ${slotIdx + 1} colour: ${slotColor.name} (click to change)`}
+                        aria-label={`Change route ${slotIdx + 1} colour (${slotColor.name})`}
+                        aria-expanded={isPickerOpen}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenColorSlotIdx(isPickerOpen ? null : slotIdx);
+                        }}
+                      />
+                      {isPickerOpen && (
+                        <div className="profile-color-popover" role="menu" aria-label="Select route colour">
+                          {ROUTE_COLOR_PALETTE.map((c) => {
+                            const isSelected = c.id === slotColor.id;
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                className={`profile-color-swatch ${isSelected ? 'selected' : ''}`}
+                                style={{ backgroundColor: c.line }}
+                                title={c.name}
+                                aria-label={c.name}
+                                aria-checked={isSelected}
+                                role="menuitemradio"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  routing.setSlotColor(slotIdx, c.id);
+                                  setOpenColorSlotIdx(null);
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <select
+                      id={slotIdx === 0 ? 'profile-select' : `profile-select-${slotIdx}`}
+                      value={slot.profile}
+                      title={slotMeta.summary}
+                      onChange={(e) => routing.setSlotProfile(slotIdx, e.target.value as ProfileName)}
+                    >
+                      {slot.profile === 'custom:__draft__' && (
+                        <option value="custom:__draft__">Live Editor Draft</option>
+                      )}
+                      {routing.customProfiles.length > 0 && (
+                        <optgroup label="Custom Profiles">
+                          {routing.customProfiles.map((cp) => (
+                            <option key={cp.id} value={cp.id}>
+                              {cp.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <optgroup label="Built-in Profiles">
+                        {PROFILE_ORDER.map((key) => (
+                          <option key={key} value={key}>
+                            {PROFILE_INFO[key].label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
+                    {routing.slots.length > 1 && (
+                      <button
+                        id={`btn-remove-profile-${slotIdx}`}
+                        type="button"
+                        className="wp-btn wp-btn-remove profile-slot-remove"
+                        title="Remove this profile from comparison"
+                        aria-label={`Remove profile ${slotIdx + 1}`}
+                        onClick={() => routing.removeProfileSlot(slotIdx)}
+                      >
+                        <Icon name="close" size={13} />
+                      </button>
                     )}
                   </div>
-                  <select
-                    id={slotIdx === 0 ? 'profile-select' : `profile-select-${slotIdx}`}
-                    value={slot.profile}
-                    title={PROFILE_INFO[slot.profile]?.summary}
-                    onChange={(e) => routing.setSlotProfile(slotIdx, e.target.value as ProfileName)}
-                  >
-                    {PROFILE_ORDER.map((key) => (
-                      <option key={key} value={key}>
-                        {PROFILE_INFO[key].label}
-                      </option>
-                    ))}
-                  </select>
-                  {routing.slots.length > 1 && (
-                    <button
-                      id={`btn-remove-profile-${slotIdx}`}
-                      type="button"
-                      className="wp-btn wp-btn-remove profile-slot-remove"
-                      title="Remove this profile from comparison"
-                      aria-label={`Remove profile ${slotIdx + 1}`}
-                      onClick={() => routing.removeProfileSlot(slotIdx)}
-                    >
-                      <Icon name="close" size={13} />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
 
         <div className="waypoints-top-bar">
           <div className="waypoints-top-left">
@@ -380,6 +418,11 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
           </div>
         </div>
       </div>
+      </div>
+
+      {!isCollapsed && isProfileEditorOpen && (
+        <ProfileEditorPanel routing={routing} onClose={onToggleProfileEditor} />
+      )}
     </div>
   );
 };

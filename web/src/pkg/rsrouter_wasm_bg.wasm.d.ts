@@ -4,6 +4,7 @@ export const memory: WebAssembly.Memory;
 export const __wbg_wasmrouter_free: (a: number, b: number) => void;
 export const wasmrouter_clear_graph: (a: number) => void;
 export const wasmrouter_edge_count: (a: number) => number;
+export const wasmrouter_inspect_point: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const wasmrouter_load_lookups: (a: number, b: number, c: number) => [number, number];
 export const wasmrouter_load_profile: (a: number, b: number, c: number, d: number, e: number) => [number, number];
 export const wasmrouter_loaded_cell_count: (a: number) => number;

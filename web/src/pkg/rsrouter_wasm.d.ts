@@ -13,6 +13,11 @@ export class WasmRouter {
      */
     edge_count(): number;
     /**
+     * Inspects the nearest road or path edge within `max_distance_m` of `(lon, lat)`
+     * and returns a JSON string of [`PointWayInfo`] (or `"null"` if no way is within range).
+     */
+    inspect_point(lon: number, lat: number, max_distance_m: number): string;
+    /**
      * Loads the lookups.dat dictionary from a string.
      */
     load_lookups(text: string): void;
@@ -58,6 +63,7 @@ export interface InitOutput {
     readonly __wbg_wasmrouter_free: (a: number, b: number) => void;
     readonly wasmrouter_clear_graph: (a: number) => void;
     readonly wasmrouter_edge_count: (a: number) => number;
+    readonly wasmrouter_inspect_point: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly wasmrouter_load_lookups: (a: number, b: number, c: number) => [number, number];
     readonly wasmrouter_load_profile: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly wasmrouter_loaded_cell_count: (a: number) => number;
