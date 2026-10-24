@@ -55,40 +55,27 @@ async function networkFirst(request, fallbackUrl, timeoutMs) {
   const key = fallbackUrl || request;
   const fromCache = () => cache.match(key, { ignoreSearch: !!fallbackUrl, ignoreVary: true });
 
-  const network = fetch(request).then(async (response) => {
-    if (response.ok) {
-      await cache.put(key, response.clone());
-    }
-    return response;
-  });
+  const controller = timeoutMs ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
-  let response;
   try {
-    if (timeoutMs) {
-      // If the cached page is served after the timeout, this request keeps running and only
-      // refreshes the cache. Its failure is then expected and has nobody waiting on it.
-      network.catch(() => {});
-      const timeout = new Promise((resolve) => setTimeout(resolve, timeoutMs, null));
-      response = await Promise.race([network, timeout]);
-      // Timed out: use the cached copy if there is one, otherwise keep waiting.
-      if (response === null) {
-        response = (await fromCache()) || (await network);
-      }
-    } else {
-      response = await network;
+    const response = await fetch(
+      request,
+      controller ? { signal: controller.signal } : undefined,
+    );
+    if (timer) clearTimeout(timer);
+    if (response.ok) {
+      cache.put(key, response.clone()).catch(() => {});
+      return response;
     }
+    const cached = await fromCache();
+    return cached || response;
   } catch (err) {
+    if (timer) clearTimeout(timer);
     const cached = await fromCache();
     if (cached) return cached;
     throw err;
   }
-
-  // Server errors (for example 502 while the site is down) must not replace a working app.
-  if (!response.ok) {
-    const cached = await fromCache();
-    if (cached) return cached;
-  }
-  return response;
 }
 
 async function cacheFirst(request) {
@@ -99,7 +86,7 @@ async function cacheFirst(request) {
   }
   const response = await fetch(request);
   if (response.ok) {
-    await cache.put(request, response.clone());
+    cache.put(request, response.clone()).catch(() => {});
   }
   return response;
 }

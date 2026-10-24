@@ -134,8 +134,12 @@ export const loadedPMTiles: Map<string, pmtiles.PMTiles> =
 let resolveArchivesReady: () => void = () => {};
 export const archivesReady: Promise<void> = new Promise<void>((resolve) => {
   resolveArchivesReady = resolve;
+  setTimeout(resolve, 1500);
 });
-if (typeof window !== 'undefined' && (window as any).map) {
+if (
+  typeof window !== 'undefined' &&
+  ((window as any).map || Object.keys(getCompletedTiles()).length === 0)
+) {
   resolveArchivesReady();
 }
 
@@ -190,21 +194,13 @@ export function useOffline(
 
   // Load PMTiles from OPFS on startup and subscribe to segment cache updates
   useEffect(() => {
-    async function initArchives() {
-      try {
-        if ('indexedDB' in window) {
-          indexedDB.deleteDatabase('rsrouter-pmtiles-v1');
-        }
-        try {
-          const tileCache = await caches.open(MAP_TILES_CACHE_NAME);
-          for (const req of await tileCache.keys()) {
-            if (!req.url.startsWith(FONT_BASE_URL)) {
-              await tileCache.delete(req);
-            }
-          }
-        } catch {}
+    let statusTimer: ReturnType<typeof setTimeout> | null = null;
 
-        for (const id of OFFLINE_PMTILES_ARCHIVES) {
+    async function initArchives() {
+      const completed = getCompletedTiles();
+      const completedIds = OFFLINE_PMTILES_ARCHIVES.filter((id) => completed[id]);
+      try {
+        for (const id of completedIds) {
           try {
             const file = await getTileFile(id);
             if (file && !loadedPMTiles.has(id)) {
@@ -218,12 +214,14 @@ export function useOffline(
         resolveArchivesReady();
       }
 
-      const status = await refreshStatus();
-      if (!navigator.onLine && status.ready) {
-        setOfflineMode(true);
-      } else if (isOfflineModeRef.current && !status.ready) {
-        setOfflineMode(false);
-      }
+      statusTimer = setTimeout(async () => {
+        const status = await refreshStatus();
+        if (!navigator.onLine && status.ready) {
+          setOfflineMode(true);
+        } else if (isOfflineModeRef.current && !status.ready) {
+          setOfflineMode(false);
+        }
+      }, 600);
     }
 
     initArchives();
@@ -248,6 +246,7 @@ export function useOffline(
 
     window.addEventListener('offline', onOffline);
     return () => {
+      if (statusTimer) clearTimeout(statusTimer);
       window.removeEventListener('offline', onOffline);
       bc?.close();
     };

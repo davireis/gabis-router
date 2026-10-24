@@ -158,6 +158,7 @@ export const App: React.FC = () => {
       <RouteInfoDrawer
         slots={routing.slots}
         getProfileMeta={routing.getProfileMeta}
+        statusMessage={routing.status}
         units={settings.units}
         onSelectSlotAlternative={routing.selectSlotAlternative}
         onRemoveSlot={routing.removeProfileSlot}

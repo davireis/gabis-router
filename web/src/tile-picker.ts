@@ -104,12 +104,12 @@ export class TilePickerControl implements maplibregl.IControl {
       {
         id: 'dense',
         label: 'GBRouter Dense',
-        desc: 'Contours, hillshade, peaks & POIs',
+        desc: 'Contours, hillshade, peaks & POIs [UK Only]',
       },
       {
         id: 'standard',
         label: 'GBRouter Light',
-        desc: 'Light tiles with cycle routes',
+        desc: 'Light tiles with cycle routes [UK Only]',
       },
       {
         id: 'cyclosm',

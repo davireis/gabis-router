@@ -402,6 +402,21 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
           <div className="pe-title-wrap">
             <Icon name="sliders" size={15} />
             <h2>Profile Editor</h2>
+            {routing.waypoints.length >= 2 && (
+              <span
+                className={`pe-live-pill ${routing.isRouting ? 'is-routing' : ''}`}
+                title={routing.isRouting ? routing.status || 'Recalculating route...' : 'Route updates live as you edit'}
+              >
+                {routing.isRouting ? (
+                  <>
+                    <span className="status-spinner status-spinner-sm" aria-hidden="true" />
+                    <span>Updating…</span>
+                  </>
+                ) : (
+                  <span>Live</span>
+                )}
+              </span>
+            )}
           </div>
           <button
             id="btn-close-profile-editor"

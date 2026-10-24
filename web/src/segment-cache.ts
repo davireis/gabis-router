@@ -159,31 +159,52 @@ export async function fetchAndCacheSegment(
   const key = `/segments4/${segmentId}.rd5`;
   const downloadUrl = getSegmentDownloadUrl(segmentId);
 
-  const res = await fetch(downloadUrl, { cache: 'no-cache' });
-  if (!res.ok || !res.body || isHtml(res)) {
-    throw new Error(`Failed to fetch routing segment ${segmentId}: HTTP ${res.status}`);
-  }
-
-  const total = Number(res.headers.get('content-length')) || 0;
-  if (total) {
-    if (total < MIN_RD5_BYTES) {
-      throw new Error(`Routing segment ${segmentId} is too small (${total} bytes)`);
-    }
-    await ensureStorageFor(total, `${segmentId}.rd5`);
-  }
+  const controller = new AbortController();
+  let stallTimer: ReturnType<typeof setTimeout> | null = setTimeout(
+    () => controller.abort(),
+    20000,
+  );
+  const resetStallTimer = () => {
+    if (stallTimer) clearTimeout(stallTimer);
+    stallTimer = setTimeout(() => controller.abort(), 20000);
+  };
 
   let received = 0;
+  let total = 0;
+  let lastMod: string | null = null;
   const chunks: Uint8Array[] = [];
-  const reader = res.body.getReader();
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    received += value.byteLength;
-    if (onProgress) {
-      onProgress(received, total);
+  try {
+    const res = await fetch(downloadUrl, { cache: 'no-cache', signal: controller.signal });
+    resetStallTimer();
+    if (!res.ok || !res.body || isHtml(res)) {
+      throw new Error(`Failed to fetch routing segment ${segmentId}: HTTP ${res.status}`);
     }
+
+    lastMod = res.headers.get('last-modified');
+    total = Number(res.headers.get('content-length')) || 0;
+    if (total) {
+      if (total < MIN_RD5_BYTES) {
+        throw new Error(`Routing segment ${segmentId} is too small (${total} bytes)`);
+      }
+      await ensureStorageFor(total, `${segmentId}.rd5`);
+      resetStallTimer();
+    }
+
+    const reader = res.body.getReader();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      resetStallTimer();
+      if (done) break;
+      chunks.push(value);
+      received += value.byteLength;
+      if (onProgress) {
+        onProgress(received, total);
+      }
+    }
+  } finally {
+    if (stallTimer) clearTimeout(stallTimer);
   }
 
   if (total ? received !== total : received < MIN_RD5_BYTES) {
@@ -199,7 +220,6 @@ export async function fetchAndCacheSegment(
 
   let creationDate = getRd5CreationDate(bytes.buffer);
   if (!creationDate) {
-    const lastMod = res.headers.get('last-modified');
     if (lastMod) {
       const parsed = new Date(lastMod);
       if (!isNaN(parsed.getTime())) creationDate = parsed;

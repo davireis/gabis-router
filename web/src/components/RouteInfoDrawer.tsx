@@ -30,6 +30,7 @@ const ALTERNATIVES = [
 interface RouteInfoDrawerProps {
   slots: RouteSlotState[];
   getProfileMeta?: (profileId: ProfileName) => ProfileMeta;
+  statusMessage?: string;
   units: Units;
   onSelectSlotAlternative: (slotIdx: number, altIdx: number) => void;
   onRemoveSlot?: (slotIdx: number) => void;
@@ -76,6 +77,7 @@ function parseRouteFeatureCollection(
 export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
   slots,
   getProfileMeta,
+  statusMessage,
   units,
   onSelectSlotAlternative,
   onRemoveSlot,
@@ -110,6 +112,7 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
   );
 
   const hasAnyRoute = parsedSlots.some((d) => d !== null);
+  const anyRouting = slots.some((s) => s.isRouting);
   const hadAnyRouteRef = useRef<boolean>(false);
 
   useEffect(() => {
@@ -119,7 +122,7 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
     hadAnyRouteRef.current = hasAnyRoute;
   }, [hasAnyRoute]);
 
-  if (!hasAnyRoute) return null;
+  if (!hasAnyRoute && !anyRouting) return null;
 
   const isMultiSlot = slots.length > 1;
   const allCollapsed = slots.every((_, idx) => Boolean(collapsedBySlot[idx]));
@@ -152,7 +155,7 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
           <div
             key={slotIdx}
             id={slotIdx === 0 ? 'route-bar-0' : `route-bar-${slotIdx}`}
-            className={`route-bar-card ${barCollapsed ? 'collapsed' : ''}`}
+            className={`route-bar-card ${barCollapsed ? 'collapsed' : ''} ${slot.isRouting ? 'is-routing' : ''}`}
             style={{ '--slot-color': slotColor.line } as React.CSSProperties}
           >
             <div
@@ -161,17 +164,25 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
             >
               <div className="ri-bar-identity">
                 <span
-                  className="ri-slot-dot"
+                  className={`ri-slot-dot ${slot.isRouting ? 'is-routing' : ''}`}
                   style={{ backgroundColor: slotColor.line }}
                   title={`Route ${slotIdx + 1} (${slotColor.name})`}
                 />
                 <span className="ri-slot-title" title={profileMeta?.summary}>
                   {profileMeta?.label || slot.profile}
                 </span>
+                {routeData && slot.isRouting && (
+                  <span
+                    className="ri-updating-badge"
+                    title={statusMessage || 'Recalculating route...'}
+                  >
+                    <span className="status-spinner status-spinner-sm" aria-hidden="true" />
+                  </span>
+                )}
               </div>
 
               {routeData ? (
-                <div className="ri-bar-metrics">
+                <div className={`ri-bar-metrics ${slot.isRouting ? 'is-routing' : ''}`}>
                   <div className="ri-stat">
                     <span id={slotIdx === 0 ? 'ri-distance' : `ri-distance-${slotIdx}`}>
                       {formatDistance(routeData.distance)}
@@ -204,9 +215,9 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="ri-bar-loading">
+                <div className="ri-bar-loading" role="status" aria-live="polite">
                   <span className="status-spinner" aria-hidden="true" />
-                  <span>Calculating route...</span>
+                  <span>{statusMessage || 'Calculating route...'}</span>
                 </div>
               )}
 

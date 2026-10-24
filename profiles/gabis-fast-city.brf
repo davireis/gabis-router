@@ -19,7 +19,7 @@ assign stick_to_cycleroutes     = true   # %stick_to_cycleroutes% | Prefer desig
 
 # Elevation parameters
 assign consider_elevation       = true   # %consider_elevation% | Set to false to ignore elevation in routing | boolean
-assign downhillcost             = 60   # %downhillcost% | Cost for going downhill | number
+assign downhillcost             = 15   # %downhillcost% | Cost for going downhill | number
 assign downhillcutoff           = 1.5   # %downhillcutoff% | Gradients below this value in percents are not counted | number
 assign uphillcost               = 0   # %uphillcost% | Cost for going uphill | number
 assign uphillcutoff             = 1.5   # %uphillcutoff% | Gradients below this value in percents are not counted | number
@@ -111,22 +111,22 @@ assign ispaved = or is_smooth_paved is_cobble_or_sett
 assign isunpaved = or is_compacted or is_gravel is_unpaved_ground
 
 assign surface_penalty =
-  if or surface=mud or surface=sand surface=clay then 9
-  else if or surface=grass surface=grass_paver then 9
-  else if or surface=wood surface=metal then 9
-  else if is_unpaved_ground then 9
-  else if surface=pebblestone then 5
-  else if is_gravel then 5
-  else if surface=fine_gravel then 1.5
-  else if is_compacted then 1.5
-  else if surface=cobblestone then 0.5
-  else if surface=sett then 0.5
-  else if is_cobble_or_sett then 0.5
+  if or surface=mud or surface=sand surface=clay then 5
+  else if or surface=grass surface=grass_paver then 5
+  else if or surface=wood surface=metal then 5
+  else if is_unpaved_ground then 5
+  else if surface=pebblestone then 1
+  else if is_gravel then 1
+  else if surface=fine_gravel then 0.5
+  else if is_compacted then 0.5
+  else if surface=cobblestone then 0
+  else if surface=sett then 0
+  else if is_cobble_or_sett then 0
   else if surface=concrete then 0
   else if surface=paved then 0
   else if is_smooth_paved then 0
-  else if is_road then 0
-  else 0
+  else if is_road then 0.3
+  else 0.3
 
 # Paved roads that are part of a recognized bike route or have cycle/bus lane infrastructure
 assign is_safe_road = and ( and is_road not isunpaved ) ( or is_cycleroute has_cycle_infra )
@@ -138,8 +138,8 @@ assign is_shared_cycleway =
 
 # Turn penalty
 assign turncost = if junction=roundabout then 30
-                  else if and stick_to_cycleroutes is_safe_road then 90
-                  else 150
+                  else if and stick_to_cycleroutes is_safe_road then 200
+                  else 250
 
 assign initialclassifier =
      if route=ferry then 1
@@ -221,23 +221,20 @@ assign onewaypenalty =
 assign trafficpenalty =
       if      estimated_traffic_class=1 then 0
       else if estimated_traffic_class=2 then 0
-      else if estimated_traffic_class=3 then 0.3
-      else if estimated_traffic_class=4 then 0.6
-      else if estimated_traffic_class=5 then 0.9
-      else if estimated_traffic_class=6 then 1.5
+      else if estimated_traffic_class=3 then 0
+      else if estimated_traffic_class=4 then 0.2
+      else if estimated_traffic_class=5 then 0.5
+      else if estimated_traffic_class=6 then 1
       else if or estimated_traffic_class=7 and estimated_traffic_class= highway=trunk|trunk_link|motorway|motorway_link then 1.5
       else if and estimated_traffic_class= is_road then 0
       else 0.0
 
 # Lane count & lighting penalties
 assign lanes_penalty =
-  if lanes=3|4|5|6|7|8 then 0
-  else 0.0
+  0.0
 
 assign lit_penalty =
-  if lit=no then 0
-  else if lit= then 0
-  else 0.0
+  0.0
 
 assign isresidentialorliving = or highway=residential|living_street living_street=yes
 
@@ -245,25 +242,18 @@ assign isresidentialorliving = or highway=residential|living_street living_stree
 assign noise_penalty =
    switch estimated_noise_class=   0
    switch estimated_noise_class=1  0
-   switch estimated_noise_class=2  0
-   switch estimated_noise_class=3  0
-   switch estimated_noise_class=4  0.1
-   switch estimated_noise_class=5  0.5
-   switch estimated_noise_class=6  1 0.0
+   switch estimated_noise_class=2  0.1
+   switch estimated_noise_class=3  0.1
+   switch estimated_noise_class=4  0.2
+   switch estimated_noise_class=5  0.3
+   switch estimated_noise_class=6  0.4 0.0
 
 assign no_forest_penalty =
-   multiply 0
-   switch estimated_forest_class=   1.0
-   switch estimated_forest_class=1  0.5
-   switch estimated_forest_class=2  0.4
-   switch estimated_forest_class=3  0.25
-   switch estimated_forest_class=4  0.15
-   switch estimated_forest_class=5  0.1
-   switch estimated_forest_class=6  0.0 0.0
+   0.0
 
 # Penalty on ordinary roads that are not part of a designated bike route or cycle/bus lane
 assign non_cycleroute_road_penalty =
-  if and stick_to_cycleroutes and is_road not is_safe_road then 0.3
+  if and stick_to_cycleroutes and is_road not is_safe_road then 0.2
   else 0.0
 
 assign costfactor
@@ -283,28 +273,28 @@ assign costfactor
 
   switch or highway=motorway highway=motorway_link    switch allow_motorways 0.5 10000
   switch or highway=trunk highway=trunk_link
-         switch is_urban_trunk 0.2
-         switch allow_motorways 0.5 9
-  switch or highway=primary highway=primary_link      0.2
-  switch or highway=secondary highway=secondary_link  0.1
+         switch is_urban_trunk 0
+         switch allow_motorways 0.5 10
+  switch or highway=primary highway=primary_link      0
+  switch or highway=secondary highway=secondary_link  0
   switch or highway=tertiary highway=tertiary_link    0
-  switch    highway=unclassified                      0.1
-  switch    isresidentialorliving                     0.3
-  switch    highway=service                           0.3
-  switch    highway=cycleway                          switch is_shared_cycleway 0.5 0.3
-  switch    highway=bridleway                         4
-  switch    highway=pedestrian                        4
-  switch    highway=footway                           2
-  switch    highway=path                              7
+  switch    highway=unclassified                      0
+  switch    isresidentialorliving                     0.1
+  switch    highway=service                           0
+  switch    highway=cycleway                          switch is_shared_cycleway 0.3 0
+  switch    highway=bridleway                         0.3
+  switch    highway=pedestrian                        5
+  switch    highway=footway                           5
+  switch    highway=path                              5
   switch    highway=steps                             switch allow_steps 119 10000
   switch    route=ferry                               switch allow_ferries 4.67 10000
   switch or highway=track highway=road
-   switch tracktype=grade1 0.2
+   switch tracktype=grade1 1
    switch tracktype=grade2 2
-   switch tracktype=grade3 9
-   switch tracktype=grade4 19
-   switch tracktype=grade5 19
-   2
+   switch tracktype=grade3 5
+   switch tracktype=grade4 5
+   switch tracktype=grade5 5
+   5
   9.0
 
 # way priorities used for voice hint generation
@@ -379,7 +369,7 @@ assign footaccess
                         1
 
 assign initialcost
-    switch or highway=traffic_signals and highway=crossing crossing=traffic_signals 20
+    switch or highway=traffic_signals and highway=crossing crossing=traffic_signals 0
        switch bikeaccess
               0
               switch footaccess

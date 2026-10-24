@@ -1,4 +1,3 @@
-import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App.tsx';
 import './style.css';
@@ -24,19 +23,21 @@ window.addEventListener('error', (event) => {
 
 const rootElement = document.getElementById('root');
 if (rootElement) {
-  ReactDOM.createRoot(rootElement).render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>,
-  );
+  ReactDOM.createRoot(rootElement).render(<App />);
 }
 
-// Service worker registration (web PWA only; native Capacitor packages assets locally)
+// Service worker registration (production web PWA only; native Capacitor packages assets locally)
 if ('serviceWorker' in navigator && !window.Capacitor?.isNativePlatform?.()) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
-      console.warn('Service worker registration failed:', err);
+  if (import.meta.env.PROD) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.warn('Service worker registration failed:', err);
+      });
     });
-  });
+  } else {
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+      for (const r of regs) r.unregister();
+    });
+  }
 }
 

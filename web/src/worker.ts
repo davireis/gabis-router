@@ -5,7 +5,6 @@ import { SEGMENT_CACHE_NAME, MIN_RD5_BYTES, fetchAndCacheSegment, isHtml } from 
 // Dedicated Web Worker running rsrouter WebAssembly off the main UI thread.
 // Uses BRouter-style lazy on-demand MicroCache cell loading via disk-backed Blob.slice + FileReaderSync.
 
-const PROFILES = ['fastbike-lowtraffic', 'fastbike', 'fastbike-verylowtraffic', 'gabis-fast-city', 'gabis-lite-gravel', 'gabis-safe-road', 'gravel', 'trekking'];
 const MAX_CACHED_CELLS = 2500;
 
 let router: WasmRouter | null = null;
@@ -13,6 +12,7 @@ let isOfflineMode = false;
 const latestSlotRouteIds = new Map<number, string>();
 let latestImportId: string | null = null;
 let latestInspectId: string | null = null;
+const loadedBuiltInProfiles = new Set<string>();
 const customProfileContents = new Map<string, string>();
 
 // Disk-backed Blob handles for 5°×5° .rd5 files (0 bytes of JS heap per file until a slice is read).
@@ -24,32 +24,49 @@ function status(message: string) {
   postMessage({ type: 'STATUS', message } satisfies WorkerMessage);
 }
 
+async function fetchWithTimeout(url: string, timeoutMs = 6000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { cache: 'no-cache', signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
- * Network-first fetch for small text files (lookups and profiles) with cache fallback.
+ * Stale-while-revalidate fetch for small text files (lookups and profiles) with timeout protection.
  */
 async function fetchText(url: string): Promise<string> {
   const cache = await caches.open(SEGMENT_CACHE_NAME);
-  if (!isOfflineMode && navigator.onLine) {
-    try {
-      const res = await fetch(url, { cache: 'no-cache' });
-      if (res.ok && !isHtml(res)) {
-        await cache.put(url, res.clone());
-        return await res.text();
-      }
-    } catch (_err) {
-      // fallback to cache below
-    }
-  }
   const cached = await cache.match(url);
   if (cached && !isHtml(cached)) {
+    if (!isOfflineMode && navigator.onLine) {
+      fetchWithTimeout(url, 4000)
+        .then((res) => {
+          if (res.ok && !isHtml(res)) {
+            cache.put(url, res).catch(() => {});
+          }
+        })
+        .catch(() => {});
+    }
     return cached.text();
   }
-  const res = await fetch(url, { cache: 'no-cache' });
+
+  const res = await fetchWithTimeout(url, 8000);
   if (!res.ok || isHtml(res)) {
     throw new Error(`Failed to fetch ${url}: HTTP ${res.status}`);
   }
-  await cache.put(url, res.clone());
-  return res.text();
+  const text = await res.text();
+  cache
+    .put(
+      url,
+      new Response(text, {
+        headers: { 'content-type': 'text/plain; charset=utf-8' },
+      }),
+    )
+    .catch(() => {});
+  return text;
 }
 
 function segmentName(lon: number, lat: number): string {
@@ -62,14 +79,14 @@ function segmentName(lon: number, lat: number): string {
 
 async function toReadableBlob(res: Response, fallbackBytes?: Uint8Array): Promise<Blob | null> {
   try {
-    const blob = await res.clone().blob();
+    const blob = await res.blob();
     if (blob.size < MIN_RD5_BYTES) return null;
     fileReaderSync.readAsArrayBuffer(blob.slice(0, 8));
     return blob;
   } catch {
+    if (!fallbackBytes) return null;
     try {
-      const buf = fallbackBytes ? (fallbackBytes as BlobPart) : await res.arrayBuffer();
-      const memBlob = new Blob([buf]);
+      const memBlob = new Blob([fallbackBytes as BlobPart]);
       if (memBlob.size < MIN_RD5_BYTES) return null;
       fileReaderSync.readAsArrayBuffer(memBlob.slice(0, 8));
       return memBlob;
@@ -141,7 +158,8 @@ async function openSegmentBlob(name: string, required: boolean): Promise<boolean
 }
 
 /**
- * Loads WASM, lookups, profiles, and attaches the synchronous Blob.slice reader callbacks.
+ * Loads WASM, lookups, and attaches the synchronous Blob.slice reader callbacks.
+ * Built-in .brf profiles are loaded lazily on first use via `ensureProfileLoaded`.
  */
 async function ensureRouter(): Promise<WasmRouter> {
   if (router) return router;
@@ -149,6 +167,7 @@ async function ensureRouter(): Promise<WasmRouter> {
   status('Initializing WebAssembly engine...');
   await init();
   const r = new WasmRouter();
+  loadedBuiltInProfiles.clear();
 
   r.set_segment_reader(
     (name: string): number => {
@@ -171,11 +190,6 @@ async function ensureRouter(): Promise<WasmRouter> {
   status('Loading lookups dictionary...');
   r.load_lookups(await fetchText('/profiles/lookups.dat'));
 
-  for (const p of PROFILES) {
-    status(`Loading profile ${p}...`);
-    r.load_profile(p, await fetchText(`/profiles/${p}.brf`));
-  }
-
   for (const [name, content] of customProfileContents.entries()) {
     try {
       r.load_profile(name, content);
@@ -189,15 +203,35 @@ async function ensureRouter(): Promise<WasmRouter> {
 }
 
 /**
+ * Lazily fetches and compiles a built-in `.brf` profile on first request.
+ */
+async function ensureProfileLoaded(r: WasmRouter, profile: string): Promise<void> {
+  if (profile.startsWith('custom:')) {
+    const content = customProfileContents.get(profile);
+    if (!content) {
+      throw new Error(`Custom profile "${profile}" is not loaded`);
+    }
+    return;
+  }
+  if (loadedBuiltInProfiles.has(profile)) return;
+  status(`Loading profile ${profile}...`);
+  const text = await fetchText(`/profiles/${profile}.brf`);
+  r.load_profile(profile, text);
+  loadedBuiltInProfiles.add(profile);
+}
+
+/**
  * Executes an operation on `WasmRouter` with lazy on-demand cell loading. If the search touches
  * a 5°×5° segment boundary whose Blob has not been opened yet, opens the missing segment Blob(s)
  * and re-runs the operation. Also self-heals on stale Blob handles or WASM traps.
  */
 async function runWithLazySegments<T>(
   initialPoints: LatLon[],
+  profile: string,
   op: (r: WasmRouter) => T,
 ): Promise<T> {
   let r = await ensureRouter();
+  await ensureProfileLoaded(r, profile);
   if (r.loaded_cell_count() > MAX_CACHED_CELLS) {
     r.clear_graph();
   }
@@ -244,6 +278,7 @@ async function runWithLazySegments<T>(
           retriedFreshRouter = true;
           retriedCleanGraph = true;
           r = await ensureRouter();
+          await ensureProfileLoaded(r, profile);
           continue;
         }
         throw err;
@@ -300,20 +335,17 @@ function extractGpxTrackPoints(gpxXml: string): LatLon[] {
 async function handleMessage(msg: WorkerMessage): Promise<void> {
   switch (msg.type) {
     case 'INIT': {
-      try {
-        await ensureRouter();
-        status('Router ready. Click on the map to set waypoints.');
-      } catch (err) {
-        status(`Initialization failed: ${String(err)}`);
-      }
+      status('Router ready. Click on the map to set waypoints.');
       break;
     }
 
     case 'LOAD_CUSTOM_PROFILE': {
       try {
-        const r = await ensureRouter();
-        r.load_profile(msg.name, msg.content);
         customProfileContents.set(msg.name, msg.content);
+        if (router || msg.id) {
+          const r = await ensureRouter();
+          r.load_profile(msg.name, msg.content);
+        }
         postMessage({
           type: 'CUSTOM_PROFILE_LOADED',
           id: msg.id,
@@ -336,8 +368,6 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
       const slotIdx = msg.slotIdx ?? 0;
       if (latestSlotRouteIds.get(slotIdx) !== msg.id) return;
       try {
-        await ensureRouter();
-        if (latestSlotRouteIds.get(slotIdx) !== msg.id) return;
         const { waypoints, profile, alternativeIdx, nogos } = msg.payload;
         const waypointsStr = waypoints.map((w) => `${w.lon},${w.lat}`).join('|');
         const nogosStr =
@@ -351,7 +381,7 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
             : undefined;
 
         status(`Calculating route (${waypoints.length} points, ${profile})...`);
-        const geojsonStr = await runWithLazySegments(waypoints, (r) =>
+        const geojsonStr = await runWithLazySegments(waypoints, profile, (r) =>
           r.route(waypointsStr, profile, alternativeIdx ?? 0, nogosStr),
         );
         if (latestSlotRouteIds.get(slotIdx) !== msg.id) return;
@@ -377,8 +407,6 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
     case 'IMPORT_GPX_REQUEST': {
       if (msg.id !== latestImportId) return;
       try {
-        await ensureRouter();
-        if (msg.id !== latestImportId) return;
         const { gpxXml, profile, toleranceM } = msg.payload;
         const trackPoints = extractGpxTrackPoints(gpxXml);
         if (trackPoints.length < 2) {
@@ -386,7 +414,7 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
         }
 
         status(`Matching GPX track (${trackPoints.length} points, ${profile})...`);
-        const rawJson = await runWithLazySegments(trackPoints, (r) =>
+        const rawJson = await runWithLazySegments(trackPoints, profile, (r) =>
           r.match_gpx_waypoints(gpxXml, profile, toleranceM ?? 20.0),
         );
         if (msg.id !== latestImportId) return;

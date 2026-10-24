@@ -7,6 +7,8 @@ interface HeaderProps {
   profileLabel?: string;
   compareCount?: number;
   isOfflineMode?: boolean;
+  isBusy?: boolean;
+  statusMessage?: string;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onOpenSettings: () => void;
@@ -18,6 +20,8 @@ export const Header: React.FC<HeaderProps> = ({
   profileLabel,
   compareCount = 0,
   isOfflineMode,
+  isBusy = false,
+  statusMessage,
   isCollapsed,
   onToggleCollapse,
   onOpenSettings,
@@ -25,6 +29,12 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const profileMeta = PROFILE_INFO[profile];
   const badgeLabel = `${profileLabel || profileMeta?.shortLabel || profile}${compareCount > 0 ? ` +${compareCount}` : ''}`;
+  const shortBusyLabel =
+    statusMessage && /download|fetch/i.test(statusMessage)
+      ? 'Loading data…'
+      : statusMessage && /init|lookup|profile/i.test(statusMessage)
+        ? 'Starting…'
+        : 'Routing…';
 
   return (
     <div
@@ -49,6 +59,17 @@ export const Header: React.FC<HeaderProps> = ({
           {isOfflineMode && (
             <span className="header-offline-pill" title="Offline Mode Active">
               Offline
+            </span>
+          )}
+          {isBusy && (
+            <span
+              className="header-busy-pill"
+              role="status"
+              aria-live="polite"
+              title={statusMessage || 'Calculating route...'}
+            >
+              <span className="status-spinner status-spinner-sm" aria-hidden="true" />
+              <span>{shortBusyLabel}</span>
             </span>
           )}
         </div>

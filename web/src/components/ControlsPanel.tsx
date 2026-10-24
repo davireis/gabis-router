@@ -169,6 +169,8 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
           profileLabel={routing.getProfileMeta(routing.profile).shortLabel}
           compareCount={Math.max(0, routing.slots.length - 1)}
           isOfflineMode={offline.isOfflineMode}
+          isBusy={isBusy}
+          statusMessage={routing.status || offline.downloadProgress.message}
           isCollapsed={isCollapsed}
           onToggleCollapse={onToggleCollapse}
           onOpenSettings={onOpenSettings}
@@ -216,11 +218,11 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
                 const isPickerOpen = openColorSlotIdx === slotIdx;
                 const slotMeta = routing.getProfileMeta(slot.profile);
                 return (
-                  <div key={slotIdx} className="profile-slot-row">
+                  <div key={slotIdx} className={`profile-slot-row ${slot.isRouting ? 'is-routing' : ''}`}>
                     <div className="profile-color-picker-wrap">
                       <button
                         type="button"
-                        className={`profile-slot-dot profile-slot-dot-btn ${isPickerOpen ? 'active' : ''}`}
+                        className={`profile-slot-dot profile-slot-dot-btn ${isPickerOpen ? 'active' : ''} ${slot.isRouting ? 'is-routing' : ''}`}
                         style={{ backgroundColor: slotColor.line }}
                         title={`Route ${slotIdx + 1} colour: ${slotColor.name} (click to change)`}
                         aria-label={`Change route ${slotIdx + 1} colour (${slotColor.name})`}
