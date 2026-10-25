@@ -92,7 +92,7 @@ test('summarizeVectorFeatures formats mountain peaks with elevation', () => {
   assert.deepEqual(summary.tags, ['Path', 'Unpaved']);
 });
 
-test('formatPointWayTags formats traffic and noise classes from RD5 way info', () => {
+test('formatPointWayTags formats traffic, noise, and speed limit classes from RD5 way info', () => {
   const tags = formatPointWayTags(
     {
       highway: 'secondary',
@@ -105,10 +105,10 @@ test('formatPointWayTags formats traffic and noise classes from RD5 way info', (
     ['Secondary road', 'Asphalt'],
   );
 
-  assert.deepEqual(tags, ['Traffic: Moderate (3/7)', 'Noise: Quiet (2/6)']);
+  assert.deepEqual(tags, ['Traffic: Fair (3/7)', 'Noise: Quiet (2/6)', 'Limit: 30 mph']);
 });
 
-test('formatPointWayTags marks car-free paths when no traffic class is present', () => {
+test('formatPointWayTags omits unmodelled class 0 traffic on paths and minor roads', () => {
   const tags = formatPointWayTags(
     {
       highway: 'cycleway',
@@ -121,5 +121,5 @@ test('formatPointWayTags marks car-free paths when no traffic class is present',
     [],
   );
 
-  assert.deepEqual(tags, ['Cycleway', 'Paved', 'Traffic: Car-free', 'Noise: Very quiet (1/6)']);
+  assert.deepEqual(tags, ['Cycleway', 'Paved', 'Noise: Very quiet (1/6)']);
 });

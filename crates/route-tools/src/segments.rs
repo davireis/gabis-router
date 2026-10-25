@@ -197,6 +197,7 @@ pub struct RouteSegment {
     pub noise_class: u8,
     pub traffic_class: u8,
     pub maxspeed: u32,
+    pub costfactor: f32,
 }
 
 fn parse_way_tags(way_kv: &str) -> (String, String, u8, u8, u32) {
@@ -270,12 +271,11 @@ pub fn extract_route_segments(route: &RouteResult) -> Vec<RouteSegment> {
         if to_dist <= from_dist {
             continue;
         }
-        let way_kv = route
-            .messages
-            .get(i)
-            .and_then(|m| m.as_ref())
-            .map(|m| m.way_key_values.as_str())
-            .unwrap_or("");
+        let msg = route.messages.get(i).and_then(|m| m.as_ref());
+        let way_kv = msg.map(|m| m.way_key_values.as_str()).unwrap_or("");
+        let costfactor = msg
+            .map(|m| (m.costfactor * 100.0).round() / 100.0)
+            .unwrap_or(1.0);
         let (surface, highway, noise_class, traffic_class, maxspeed) = parse_way_tags(way_kv);
 
         if let Some(last) = segments.last_mut() {
@@ -284,6 +284,7 @@ pub fn extract_route_segments(route: &RouteResult) -> Vec<RouteSegment> {
                 && last.noise_class == noise_class
                 && last.traffic_class == traffic_class
                 && last.maxspeed == maxspeed
+                && (last.costfactor - costfactor).abs() < 0.005
             {
                 last.to_dist_m = to_dist;
                 continue;
@@ -297,6 +298,7 @@ pub fn extract_route_segments(route: &RouteResult) -> Vec<RouteSegment> {
             noise_class,
             traffic_class,
             maxspeed,
+            costfactor,
         });
     }
 
@@ -315,14 +317,15 @@ pub fn to_geojson_with_segments(route: &RouteResult, profile_name: &str) -> Stri
             seg_json.push_str(",\n          ");
         }
         seg_json.push_str(&format!(
-            r#"{{"from": {:.1}, "to": {:.1}, "surface": "{}", "highway": "{}", "noise": {}, "traffic": {}, "maxspeed": {}}}"#,
+            r#"{{"from": {:.1}, "to": {:.1}, "surface": "{}", "highway": "{}", "noise": {}, "traffic": {}, "maxspeed": {}, "costfactor": {:.2}}}"#,
             seg.from_dist_m,
             seg.to_dist_m,
             seg.surface,
             seg.highway,
             seg.noise_class,
             seg.traffic_class,
-            seg.maxspeed
+            seg.maxspeed,
+            seg.costfactor
         ));
     }
 

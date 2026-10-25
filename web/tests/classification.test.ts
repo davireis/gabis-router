@@ -10,6 +10,8 @@ import {
   classifyNoise,
   classifyNoiseSubclass,
   classifySpeedLimit,
+  classifyCost,
+  buildCostBreakdown,
   ROAD_META,
   ROAD_GROUP_META,
   SURFACE_META,
@@ -92,13 +94,13 @@ test('classifySurface & classifySurfaceSubclass: maps OSM surface tags to classe
   assert.equal(classifySurfaceSubclass('cobblestone'), 'cobblestone');
 
   for (const s of ['compacted', 'fine_gravel']) {
-    assert.equal(classifySurface(s), 'compacted');
+    assert.equal(classifySurface(s), 'unpaved');
   }
   assert.equal(classifySurfaceSubclass('compacted'), 'compacted');
   assert.equal(classifySurfaceSubclass('fine_gravel'), 'fine_gravel');
 
   for (const s of ['gravel', 'pebblestone']) {
-    assert.equal(classifySurface(s), 'gravel');
+    assert.equal(classifySurface(s), 'unpaved');
   }
   assert.equal(classifySurfaceSubclass('gravel'), 'gravel');
   assert.equal(classifySurfaceSubclass('pebblestone'), 'pebblestone');
@@ -145,8 +147,6 @@ test('classifyRoad, classifySurface, classifyTraffic & classifyNoise: all classe
   const surfCategories: SurfaceCategory[] = [
     'paved',
     'cobblestone',
-    'compacted',
-    'gravel',
     'unpaved',
     'unknown',
   ];
@@ -161,17 +161,28 @@ test('classifyRoad, classifySurface, classifyTraffic & classifyNoise: all classe
     assert.ok(SURFACE_META[SURFACE_SUB_META[sub].parent], `Missing parent for surface sub ${sub}`);
   }
 
-  assert.equal(classifyTraffic(1, 'residential'), 'low');
+  assert.equal(classifyTraffic(0, 'cycleway'), 'quiet');
+  assert.equal(classifyTrafficSubclass(0, 'cycleway'), 'class_0');
+  assert.equal(classifyTraffic(0, 'residential'), 'quiet');
+  assert.equal(classifyTrafficSubclass(0, 'residential'), 'class_0');
+  assert.equal(classifyTraffic(1, 'residential'), 'quiet');
+  assert.equal(classifyTraffic(3, 'secondary'), 'quiet');
   assert.equal(classifyTrafficSubclass(1, 'residential'), 'class_1');
-  assert.equal(classifyTraffic(6, 'primary'), 'severe');
+  assert.equal(classifyTraffic(4, 'secondary'), 'busy');
+  assert.equal(classifyTraffic(5, 'primary'), 'busy');
+  assert.equal(classifyTraffic(6, 'primary'), 'heavy');
   assert.equal(classifyTrafficSubclass(6, 'primary'), 'class_6');
-  assert.equal(classifyTraffic(0, 'trunk'), 'severe');
+  assert.equal(classifyTraffic(0, 'trunk'), 'heavy');
   assert.equal(classifyTrafficSubclass(undefined, 'trunk'), 'class_7');
   assert.equal(classifyTrafficSubclass(0, 'trunk_link'), 'class_7');
   for (const sub of Object.keys(TRAFFIC_SUB_META) as Array<keyof typeof TRAFFIC_SUB_META>) {
     assert.ok(TRAFFIC_META[TRAFFIC_SUB_META[sub].parent], `Missing parent for traffic sub ${sub}`);
   }
 
+  assert.equal(classifyNoise(undefined), 'very_quiet');
+  assert.equal(classifyNoiseSubclass(undefined), 'class_0');
+  assert.equal(classifyNoise(0), 'very_quiet');
+  assert.equal(classifyNoiseSubclass(0), 'class_0');
   assert.equal(classifyNoise(1), 'very_quiet');
   assert.equal(classifyNoiseSubclass(1), 'class_1');
   assert.equal(classifyNoise(6), 'loud');
@@ -212,4 +223,33 @@ test('classifySpeedLimit: car-free infrastructure, explicit km/h limits, and unt
     assert.ok(SPEED_LIMIT_META[cat]?.label);
     assert.ok(SPEED_LIMIT_META[cat]?.color);
   }
+});
+
+test('classifyCost and buildCostBreakdown map segment costfactors to 1–1.5, 1.5–2, 2–3, 3+ buckets and exact subclasses', () => {
+  const segments = [
+    { from: 0, to: 500, surface: 'asphalt', highway: 'cycleway', costfactor: 1.2 },
+    { from: 500, to: 700, surface: 'asphalt', highway: 'residential', costfactor: 1.8 },
+    { from: 700, to: 850, surface: 'asphalt', highway: 'tertiary', costfactor: 2.5 },
+    { from: 850, to: 1000, surface: 'asphalt', highway: 'primary', costfactor: 3.4 },
+  ];
+
+  assert.equal(classifyCost(1.0), 'c1_15');
+  assert.equal(classifyCost(1.5), 'c1_15');
+  assert.equal(classifyCost(1.51), 'c15_2');
+  assert.equal(classifyCost(2.0), 'c15_2');
+  assert.equal(classifyCost(2.5), 'c2_3');
+  assert.equal(classifyCost(3.0), 'c2_3');
+  assert.equal(classifyCost(3.1), 'c3_plus');
+
+  const { classifier, meta, subClassifier, subMeta } = buildCostBreakdown(segments);
+  assert.equal(classifier(segments[0]), 'c1_15');
+  assert.equal(classifier(segments[1]), 'c15_2');
+  assert.equal(classifier(segments[2]), 'c2_3');
+  assert.equal(classifier(segments[3]), 'c3_plus');
+  assert.equal(meta.c1_15.label, '[1, 1.5]');
+  assert.equal(meta.c15_2.label, '(1.5, 2]');
+  assert.equal(meta.c2_3.label, '(2, 3]');
+  assert.equal(meta.c3_plus.label, '(3, ∞)');
+  assert.equal(subClassifier(segments[0]), '1.20');
+  assert.equal(subMeta['1.20'].label, '1.20×');
 });

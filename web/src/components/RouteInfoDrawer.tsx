@@ -46,6 +46,8 @@ interface ParsedSlotData {
   time: number;
   ascent: number;
   descent: number;
+  cost: number;
+  costFactor: number;
   profile: ReturnType<typeof buildProfile>;
   segments: SegmentData[];
 }
@@ -60,15 +62,21 @@ function parseRouteFeatureCollection(
   const prof = buildProfile(coords);
   const segs: SegmentData[] = props.segments || [];
 
+  const distance = Number(props['track-length'] || 0);
+  const cost = Number(props.cost || 0);
+  const costFactor = distance > 0 && cost > 0 ? cost / distance : 0;
+
   const ascent = Number(props['filtered ascend'] || 0);
   const net = prof.ele.length > 0 ? prof.ele[prof.ele.length - 1] - prof.ele[0] : 0;
   const descent = Math.max(0, ascent - net);
 
   return {
-    distance: Number(props['track-length'] || 0),
+    distance,
     time: Number(props['total-time'] || 0),
     ascent,
     descent,
+    cost,
+    costFactor,
     profile: prof,
     segments: segs,
   };
@@ -213,6 +221,17 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
                     </span>
                     <small>Avg Speed</small>
                   </div>
+                  {routeData.costFactor > 0 && (
+                    <div
+                      className="ri-stat"
+                      title={`Exact router cost: ${Math.round(routeData.cost).toLocaleString()} (${routeData.costFactor.toFixed(2)}× distance)`}
+                    >
+                      <span id={slotIdx === 0 ? 'ri-cost' : `ri-cost-${slotIdx}`}>
+                        {routeData.costFactor.toFixed(2)}×
+                      </span>
+                      <small>Cost</small>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="ri-bar-loading" role="status" aria-live="polite">

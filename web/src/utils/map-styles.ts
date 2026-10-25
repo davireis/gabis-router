@@ -53,354 +53,138 @@ function getSpriteBaseUrl(): string {
 }
 
 function buildCycleRouteHighlightLayers(): any[] {
-  return [
+  const specs: Array<{
+    id: string;
+    minzoom: number;
+    filter: any[];
+    haloColor: any;
+    coreColor: any;
+    haloWidth: any[];
+    coreWidth: any[];
+    dashed?: boolean;
+  }> = [
     // MTB route relations - gold-olive (distinct from orange route slot)
     {
       id: 'ocm-route-mtb',
-      type: 'line',
-      source: 'cycle_routes',
-      'source-layer': 'cycle_routes',
       minzoom: 8,
       filter: ['==', ['get', 'network'], 'mtb'],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          8,
-          '#ca8a04',
-          12,
-          '#eab308',
-          14,
-          '#facc15',
-          16,
-          '#fde047',
-        ],
-        'line-width': [
-          'interpolate',
-          ['exponential', 1.45],
-          ['zoom'],
-          8,
-          1.4,
-          10,
-          2.5,
-          12,
-          5.6,
-          13,
-          8.6,
-          14,
-          13.2,
-          15,
-          18.5,
-          16,
-          25.5,
-          18,
-          38.0,
-        ],
-        'line-opacity': 1,
-      },
+      haloColor: '#fde047',
+      coreColor: ['interpolate', ['linear'], ['zoom'], 8, '#a16207', 12, '#ca8a04', 16, '#eab308'],
+      haloWidth: ['interpolate', ['exponential', 1.45], ['zoom'], 8, 1.0, 10, 1.4, 12, 2.6, 13, 6.5, 14, 13.5, 15, 20.0, 16, 27.0, 18, 38.0],
+      coreWidth: ['interpolate', ['exponential', 1.3], ['zoom'], 8, 0.7, 10, 0.9, 12, 1.3, 13, 1.8, 14, 2.5, 16, 3.6, 18, 5.0],
     },
-    // LCN (Local Cycle Network) - teal (distinct from RCN purple and indigo cycleways)
+    // LCN (Local Cycle Network) - lighter purple core with clear lilac halo
     {
       id: 'ocm-route-lcn',
-      type: 'line',
-      source: 'cycle_routes',
-      'source-layer': 'cycle_routes',
       minzoom: 8,
       filter: ['all', ['==', ['get', 'network'], 'lcn'], ['!=', ['get', 'state'], 'proposed']],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          8,
-          '#0d9488',
-          12,
-          '#14b8a6',
-          14,
-          '#2dd4bf',
-          16,
-          '#5eead4',
-        ],
-        'line-width': [
-          'interpolate',
-          ['exponential', 1.45],
-          ['zoom'],
-          8,
-          1.5,
-          10,
-          2.6,
-          12,
-          5.8,
-          13,
-          9.0,
-          14,
-          13.8,
-          15,
-          19.5,
-          16,
-          26.5,
-          18,
-          39.0,
-        ],
-        'line-opacity': 1,
-      },
+      haloColor: '#d8b4fe',
+      coreColor: ['interpolate', ['linear'], ['zoom'], 8, '#9333ea', 12, '#a855f7', 16, '#b469ff'],
+      haloWidth: ['interpolate', ['exponential', 1.45], ['zoom'], 8, 1.0, 10, 1.5, 12, 2.8, 13, 7.0, 14, 14.5, 15, 21.5, 16, 28.5, 18, 40.0],
+      coreWidth: ['interpolate', ['exponential', 1.3], ['zoom'], 8, 0.7, 10, 0.95, 12, 1.4, 13, 1.9, 14, 2.6, 16, 3.8, 18, 5.4],
     },
     {
       id: 'ocm-route-lcn-proposed',
-      type: 'line',
-      source: 'cycle_routes',
-      'source-layer': 'cycle_routes',
       minzoom: 9,
       filter: ['all', ['==', ['get', 'network'], 'lcn'], ['==', ['get', 'state'], 'proposed']],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          9,
-          '#16a34a',
-          12,
-          '#22c55e',
-          14,
-          '#4ade80',
-          16,
-          '#86efac',
-        ],
-        'line-width': [
-          'interpolate',
-          ['exponential', 1.45],
-          ['zoom'],
-          9,
-          1.8,
-          12,
-          5.4,
-          13,
-          8.4,
-          14,
-          12.8,
-          15,
-          18.0,
-          16,
-          24.5,
-          18,
-          37.0,
-        ],
-        'line-opacity': 1,
-      },
+      haloColor: '#e2c6ff',
+      coreColor: ['interpolate', ['linear'], ['zoom'], 9, '#9333ea', 12, '#a855f7', 16, '#b469ff'],
+      haloWidth: ['interpolate', ['exponential', 1.45], ['zoom'], 9, 1.1, 12, 2.5, 13, 6.2, 14, 13.0, 15, 19.5, 16, 26.0, 18, 36.0],
+      coreWidth: ['interpolate', ['exponential', 1.3], ['zoom'], 9, 0.7, 12, 1.3, 13, 1.8, 14, 2.4, 16, 3.5, 18, 5.0],
+      dashed: true,
     },
-    // RCN (Regional Cycle Network) - violet-purple
+    // RCN (Regional Cycle Network) - dark royal purple core with medium violet halo
     {
       id: 'ocm-route-rcn',
-      type: 'line',
-      source: 'cycle_routes',
-      'source-layer': 'cycle_routes',
       minzoom: 7,
       filter: ['all', ['==', ['get', 'network'], 'rcn'], ['!=', ['get', 'state'], 'proposed']],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          7,
-          '#9333ea',
-          12,
-          '#a855f7',
-          14,
-          '#c084fc',
-          16,
-          '#d8b4fe',
-        ],
-        'line-width': [
-          'interpolate',
-          ['exponential', 1.45],
-          ['zoom'],
-          7,
-          1.4,
-          9,
-          2.4,
-          11,
-          4.2,
-          12,
-          6.2,
-          13,
-          9.5,
-          14,
-          14.5,
-          15,
-          20.5,
-          16,
-          28.0,
-          18,
-          41.0,
-        ],
-        'line-opacity': 1,
-      },
+      haloColor: '#b983f8',
+      coreColor: ['interpolate', ['linear'], ['zoom'], 7, '#581c87', 12, '#6b21a8', 16, '#7e22ce'],
+      haloWidth: ['interpolate', ['exponential', 1.45], ['zoom'], 7, 1.0, 9, 1.4, 11, 2.0, 12, 3.0, 13, 7.5, 14, 15.2, 15, 22.5, 16, 30.0, 18, 42.0],
+      coreWidth: ['interpolate', ['exponential', 1.3], ['zoom'], 7, 0.75, 10, 1.0, 12, 1.5, 13, 2.0, 14, 2.8, 16, 4.0, 18, 5.6],
     },
     {
       id: 'ocm-route-rcn-proposed',
-      type: 'line',
-      source: 'cycle_routes',
-      'source-layer': 'cycle_routes',
       minzoom: 8,
       filter: ['all', ['==', ['get', 'network'], 'rcn'], ['==', ['get', 'state'], 'proposed']],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          8,
-          '#16a34a',
-          12,
-          '#22c55e',
-          14,
-          '#4ade80',
-          16,
-          '#86efac',
-        ],
-        'line-width': [
-          'interpolate',
-          ['exponential', 1.45],
-          ['zoom'],
-          8,
-          1.5,
-          10,
-          2.6,
-          12,
-          5.8,
-          13,
-          8.8,
-          14,
-          13.5,
-          15,
-          19.0,
-          16,
-          26.0,
-          18,
-          39.0,
-        ],
-        'line-opacity': 1,
-      },
+      haloColor: '#c99df9',
+      coreColor: ['interpolate', ['linear'], ['zoom'], 8, '#581c87', 12, '#6b21a8', 16, '#7e22ce'],
+      haloWidth: ['interpolate', ['exponential', 1.45], ['zoom'], 8, 1.0, 10, 1.4, 12, 2.7, 13, 6.8, 14, 14.0, 15, 20.5, 16, 27.5, 18, 38.0],
+      coreWidth: ['interpolate', ['exponential', 1.3], ['zoom'], 8, 0.7, 10, 0.95, 12, 1.4, 13, 1.9, 14, 2.6, 16, 3.7, 18, 5.2],
+      dashed: true,
     },
-    // NCN & ICN (National & International Cycle Network) - soft rose/coral red
+    // NCN & ICN (National & International Cycle Network) - warm orangy-red core with salmon halo
     {
       id: 'ocm-route-ncn',
-      type: 'line',
-      source: 'cycle_routes',
-      'source-layer': 'cycle_routes',
       minzoom: 5,
       filter: [
         'all',
         ['match', ['get', 'network'], ['ncn', 'icn'], true, false],
         ['!=', ['get', 'state'], 'proposed'],
       ],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          5,
-          '#e11d48',
-          12,
-          '#f43f5e',
-          14,
-          '#fb7185',
-          16,
-          '#fda4af',
-        ],
-        'line-width': [
-          'interpolate',
-          ['exponential', 1.45],
-          ['zoom'],
-          5,
-          1.0,
-          7,
-          1.6,
-          9,
-          2.7,
-          11,
-          4.5,
-          12,
-          6.6,
-          13,
-          10.2,
-          14,
-          15.4,
-          15,
-          21.5,
-          16,
-          29.5,
-          18,
-          43.0,
-        ],
-        'line-opacity': 1,
-      },
+      haloColor: '#fb9278',
+      coreColor: ['interpolate', ['linear'], ['zoom'], 5, '#c82312', 12, '#dc2c18', 14, '#ef4423', 16, '#f25435'],
+      haloWidth: ['interpolate', ['exponential', 1.45], ['zoom'], 5, 0.9, 7, 1.2, 9, 1.6, 11, 2.2, 12, 3.4, 13, 8.0, 14, 16.0, 15, 23.5, 16, 31.5, 18, 44.0],
+      coreWidth: ['interpolate', ['exponential', 1.3], ['zoom'], 5, 0.65, 8, 0.9, 11, 1.25, 12, 1.6, 13, 2.2, 15, 3.5, 18, 5.8],
     },
     {
       id: 'ocm-route-ncn-proposed',
-      type: 'line',
-      source: 'cycle_routes',
-      'source-layer': 'cycle_routes',
       minzoom: 7,
       filter: [
         'all',
         ['match', ['get', 'network'], ['ncn', 'icn'], true, false],
         ['==', ['get', 'state'], 'proposed'],
       ],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          7,
-          '#16a34a',
-          12,
-          '#22c55e',
-          14,
-          '#4ade80',
-          16,
-          '#86efac',
-        ],
-        'line-width': [
-          'interpolate',
-          ['exponential', 1.45],
-          ['zoom'],
-          7,
-          1.4,
-          9,
-          2.4,
-          12,
-          6.0,
-          13,
-          9.2,
-          14,
-          14.0,
-          15,
-          19.8,
-          16,
-          27.0,
-          18,
-          40.0,
-        ],
-        'line-opacity': 1,
-      },
+      haloColor: '#fca590',
+      coreColor: ['interpolate', ['linear'], ['zoom'], 7, '#c82312', 12, '#dc2c18', 14, '#ef4423', 16, '#f25435'],
+      haloWidth: ['interpolate', ['exponential', 1.45], ['zoom'], 7, 1.0, 9, 1.4, 12, 3.0, 13, 7.2, 14, 14.8, 15, 21.5, 16, 29.0, 18, 40.0],
+      coreWidth: ['interpolate', ['exponential', 1.3], ['zoom'], 7, 0.7, 10, 0.95, 12, 1.4, 13, 1.9, 14, 2.6, 16, 3.8, 18, 5.5],
+      dashed: true,
     },
   ];
+
+  // Both halo and core use 'line-opacity': 1 and 'line-cap': 'round' so there are zero
+  // vertex starbursts or butt-cap steps, and the solid pastel halo stays clearly visible around planned routes.
+  const haloLayers = specs.map((s) => ({
+    id: s.id,
+    type: 'line',
+    source: 'cycle_routes',
+    'source-layer': 'cycle_routes',
+    minzoom: s.minzoom,
+    filter: s.filter,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': s.haloColor,
+      'line-width': s.haloWidth,
+      'line-opacity': 1,
+    },
+  }));
+
+  const coreLayers = specs.map((s) => ({
+    id: `${s.id}-core`,
+    type: 'line',
+    source: 'cycle_routes',
+    'source-layer': 'cycle_routes',
+    minzoom: s.minzoom,
+    filter: s.filter,
+    layout: { 'line-cap': s.dashed ? 'butt' : 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': s.coreColor,
+      'line-width': s.coreWidth,
+      'line-opacity': 1,
+      ...(s.dashed ? { 'line-dasharray': [2.2, 1.8] } : {}),
+    },
+  }));
+
+  return [...haloLayers, ...coreLayers];
 }
 
 const CYCLE_SHIELD_COLORS: Record<string, string> = {
-  'cycle-shield-ncn': '#e11d48',
-  'cycle-shield-rcn': '#9333ea',
-  'cycle-shield-lcn': '#0d9488',
-  'cycle-shield-mtb': '#ca8a04',
-  'cycle-shield-proposed': '#15803d',
+  'cycle-shield-ncn': '#a81c0c',
+  'cycle-shield-rcn': '#4c1d95',
+  'cycle-shield-lcn': '#7e22ce',
+  'cycle-shield-mtb': '#854d0e',
+  'cycle-shield-proposed': '#334155',
 };
 
 function createShieldImageData(hexColor: string): {
@@ -596,7 +380,7 @@ function buildCycleRouteLabelLayers(): any[] {
     filter,
     layout: {
       'symbol-placement': 'line',
-      'symbol-spacing': ['interpolate', ['linear'], ['zoom'], 7, 170, 10, 210, 13, 250, 16, 290],
+      'symbol-spacing': ['interpolate', ['linear'], ['zoom'], 7, 130, 10, 165, 13, 200, 16, 240],
       'icon-image': shieldImage,
       'icon-rotation-alignment': 'viewport',
       'icon-text-fit': 'both',
@@ -630,31 +414,31 @@ function buildCycleRouteLabelLayers(): any[] {
   return [
     makeShieldLayer(
       'ocm-route-label-proposed',
-      8,
+      11,
       ['all', ['==', ['get', 'state'], 'proposed'], ['has', 'ref']],
       'cycle-shield-proposed',
     ),
     makeShieldLayer(
       'ocm-route-label-mtb',
-      9,
+      11,
       ['all', ['==', ['get', 'network'], 'mtb'], ['!=', ['get', 'state'], 'proposed'], ['has', 'ref']],
       'cycle-shield-mtb',
     ),
     makeShieldLayer(
       'ocm-route-label-lcn',
-      9,
+      11,
       ['all', ['==', ['get', 'network'], 'lcn'], ['!=', ['get', 'state'], 'proposed'], ['has', 'ref']],
       'cycle-shield-lcn',
     ),
     makeShieldLayer(
       'ocm-route-label-rcn',
-      8,
+      10.5,
       ['all', ['==', ['get', 'network'], 'rcn'], ['!=', ['get', 'state'], 'proposed'], ['has', 'ref']],
       'cycle-shield-rcn',
     ),
     makeShieldLayer(
       'ocm-route-label-ncn',
-      7,
+      10,
       [
         'all',
         ['in', ['get', 'network'], ['literal', ['ncn', 'icn']]],
@@ -863,35 +647,49 @@ function buildParkForestLabelLayer(isLight: boolean): any {
     type: 'symbol',
     source: 'openmaptiles',
     'source-layer': 'park',
-    minzoom: isLight ? 11.5 : 10.5,
+    minzoom: isLight ? 11.5 : 7.5,
     filter: [
       'all',
       ['==', ['geometry-type'], 'Point'],
       ['has', 'name'],
-      [
-        'step',
-        ['zoom'],
-        ['<=', ['coalesce', ['get', 'rank'], 99], 1],
-        12,
-        ['<=', ['coalesce', ['get', 'rank'], 99], 2],
-        13.5,
-        ['<=', ['coalesce', ['get', 'rank'], 99], 4],
-        15,
-        true,
-      ],
+      isLight
+        ? [
+            'step',
+            ['zoom'],
+            ['<=', ['coalesce', ['get', 'rank'], 99], 1],
+            12,
+            ['<=', ['coalesce', ['get', 'rank'], 99], 2],
+            13.5,
+            ['<=', ['coalesce', ['get', 'rank'], 99], 4],
+            15,
+            true,
+          ]
+        : [
+            'step',
+            ['zoom'],
+            ['<=', ['coalesce', ['get', 'rank'], 99], 1],
+            9,
+            ['<=', ['coalesce', ['get', 'rank'], 99], 2],
+            11,
+            ['<=', ['coalesce', ['get', 'rank'], 99], 3],
+            13,
+            ['<=', ['coalesce', ['get', 'rank'], 99], 5],
+            14.5,
+            true,
+          ],
     ],
     layout: {
       'text-field': ['coalesce', ['get', 'name_en'], ['get', 'name']],
       'text-font': ['Noto Sans Italic'],
-      'text-size': ['interpolate', ['linear'], ['zoom'], 10.5, 10, 14, 11.5],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 7.5, 9.5, 10.5, 10.5, 14, 12],
       'text-max-width': 8,
-      'text-padding': isLight ? 48 : 36,
+      'text-padding': isLight ? 48 : 28,
     },
     paint: {
       'text-color': isLight ? '#2f6f44' : '#166534',
       'text-opacity': isLight ? 0.82 : 0.92,
-      'text-halo-color': 'rgba(255, 255, 255, 0.85)',
-      'text-halo-width': 1.2,
+      'text-halo-color': 'rgba(255, 255, 255, 0.88)',
+      'text-halo-width': 1.3,
     },
   };
 }
@@ -934,6 +732,116 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
         18,
         2.6,
       ];
+    } else if (layer.id === 'landuse-residential' && layer.paint) {
+      layer.paint['fill-antialias'] = true;
+      layer.paint['fill-color'] = [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        6,
+        '#e6dacb',
+        10,
+        '#ece2d6',
+        14,
+        '#f2ebe2',
+      ];
+      layer.paint['fill-opacity'] = [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        6,
+        0.72,
+        10,
+        0.62,
+        14,
+        0.45,
+      ];
+      layer.paint['fill-outline-color'] = 'rgba(172, 152, 130, 0.28)';
+    } else if (layer.id === 'waterway-river' && layer.paint) {
+      layer.minzoom = 6;
+      layer.paint['line-color'] = '#64a6e3';
+      layer.paint['line-width'] = [
+        'interpolate',
+        ['exponential', 1.3],
+        ['zoom'],
+        6,
+        0.65,
+        8,
+        1.15,
+        10,
+        1.75,
+        13,
+        2.8,
+        16,
+        4.5,
+        20,
+        7.5,
+      ];
+    } else if (layer.id === 'waterway-stream-canal' && layer.paint) {
+      layer.minzoom = 9.5;
+      layer.paint['line-color'] = '#74b2e8';
+      layer.paint['line-width'] = [
+        'interpolate',
+        ['exponential', 1.3],
+        ['zoom'],
+        9.5,
+        0.5,
+        12,
+        0.95,
+        15,
+        1.8,
+        20,
+        5.5,
+      ];
+    } else if (layer.id === 'waterway_line_label') {
+      layer.minzoom = 9;
+      if (layer.layout) {
+        layer.layout['text-size'] = ['interpolate', ['linear'], ['zoom'], 9, 10.5, 13, 13.5];
+      }
+      if (layer.paint) {
+        layer.paint['text-color'] = '#3b78bd';
+        layer.paint['text-halo-color'] = 'rgba(255, 255, 255, 0.82)';
+      }
+    } else if (layer.id === 'railway' && layer.paint) {
+      layer.minzoom = 8.5;
+      layer.paint['line-color'] = '#7c8594';
+      layer.paint['line-opacity'] = ['interpolate', ['linear'], ['zoom'], 8.5, 0.55, 11, 0.75, 14, 0.9];
+      layer.paint['line-width'] = [
+        'interpolate',
+        ['exponential', 1.35],
+        ['zoom'],
+        8.5,
+        0.55,
+        11,
+        0.85,
+        14,
+        1.2,
+        18,
+        2.2,
+      ];
+    } else if (layer.id === 'railway-hatching' && layer.paint) {
+      layer.minzoom = 10;
+      layer.paint['line-color'] = '#7c8594';
+      layer.paint['line-opacity'] = ['interpolate', ['linear'], ['zoom'], 10, 0.5, 13, 0.75];
+      layer.paint['line-dasharray'] = [0.25, 6];
+      layer.paint['line-width'] = [
+        'interpolate',
+        ['exponential', 1.35],
+        ['zoom'],
+        10,
+        1.8,
+        13,
+        3.0,
+        16,
+        4.8,
+        20,
+        7.5,
+      ];
+    } else if (layer.id === 'boundary_3' && layer.paint) {
+      layer.paint['line-color'] = '#8e8299';
+      layer.paint['line-opacity'] = ['interpolate', ['linear'], ['zoom'], 6, 0.42, 10, 0.58];
+      layer.paint['line-dasharray'] = [3, 2];
+      layer.paint['line-width'] = ['interpolate', ['linear'], ['zoom'], 6, 0.7, 11, 1.3];
     } else if (layer.id === 'highway-name-major') {
       layer.minzoom = 10.5;
     } else if (layer.id === 'highway-name-minor') {
@@ -955,7 +863,28 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
     }
   }
 
-  // 2. Add hillshade and 10m/50m contour lines below water & roads when online
+  // Add crisp shoreline outline around water bodies
+  const waterFillIdx = layers.findIndex((l) => l.id === 'water');
+  if (waterFillIdx >= 0) {
+    layers.splice(waterFillIdx + 1, 0, {
+      id: 'dense-water-outline',
+      type: 'line',
+      source: 'openmaptiles',
+      'source-layer': 'water',
+      filter: [
+        'all',
+        ['!=', ['get', 'intermittent'], 1],
+        ['!=', ['get', 'brunnel'], 'tunnel'],
+      ],
+      paint: {
+        'line-color': '#78aed3',
+        'line-opacity': 0.75,
+        'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.45, 10, 0.75, 14, 1.1],
+      },
+    });
+  }
+
+  // 2. Add hillshade and contour lines below water & roads when online
   const waterIdx = layers.findIndex((l) => l.id === 'waterway_tunnel');
   const terrainInsertIdx = waterIdx >= 0 ? waterIdx : 14;
 
@@ -976,6 +905,8 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
         demSource.contourProtocolUrl({
           overzoom: 1,
           thresholds: {
+            9: [50, 150],
+            10: [25, 100],
             11: [20, 100],
             12: [10, 50],
             14: [10, 50],
@@ -985,7 +916,7 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
           contourLayer: 'contours',
         }),
       ],
-      minzoom: 11,
+      minzoom: 9,
       maxzoom: 15,
     };
 
@@ -997,10 +928,22 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
         type: 'hillshade',
         source: 'dem',
         paint: {
-          'hillshade-exaggeration': 0.26,
-          'hillshade-shadow-color': '#475569',
-          'hillshade-highlight-color': '#ffffff',
-          'hillshade-accent-color': '#64748b',
+          'hillshade-exaggeration': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            5,
+            0.62,
+            8,
+            0.56,
+            11,
+            0.44,
+            14,
+            0.32,
+          ],
+          'hillshade-shadow-color': '#334155',
+          'hillshade-highlight-color': '#fffdf7',
+          'hillshade-accent-color': '#5c4033',
         },
       },
       {
@@ -1008,11 +951,37 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
         type: 'line',
         source: 'contours',
         'source-layer': 'contours',
-        minzoom: 11,
+        minzoom: 9,
         paint: {
-          'line-color': '#b88c65',
-          'line-opacity': ['match', ['get', 'level'], 1, 0.42, 0.22],
-          'line-width': ['match', ['get', 'level'], 1, 1.05, 0.55],
+          'line-color': [
+            'interpolate',
+            ['linear'],
+            ['coalesce', ['get', 'ele'], 0],
+            0,
+            '#b88c65',
+            150,
+            '#9c6b43',
+            400,
+            '#7c4a28',
+          ],
+          'line-opacity': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            9,
+            ['match', ['get', 'level'], 1, 0.34, 0.16],
+            11,
+            ['match', ['get', 'level'], 1, 0.45, 0.24],
+          ],
+          'line-width': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            9,
+            ['match', ['get', 'level'], 1, 0.85, 0.4],
+            12,
+            ['match', ['get', 'level'], 1, 1.1, 0.55],
+          ],
         },
       },
     );
@@ -1162,7 +1131,7 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
       type: 'symbol',
       source: 'contours',
       'source-layer': 'contours',
-      minzoom: 12,
+      minzoom: 10.5,
       filter: ['>', ['get', 'level'], 0],
       layout: {
         'symbol-placement': 'line',
@@ -1308,7 +1277,7 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
       type: 'symbol',
       source: 'openmaptiles',
       'source-layer': 'mountain_peak',
-      minzoom: 11,
+      minzoom: 8.5,
       filter: [
         'all',
         ['has', 'name'],
@@ -1316,15 +1285,17 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
           'step',
           ['zoom'],
           ['<=', ['coalesce', ['get', 'rank'], 99], 1],
+          10.5,
+          ['<=', ['coalesce', ['get', 'rank'], 99], 2],
           12.5,
-          ['<=', ['coalesce', ['get', 'rank'], 99], 3],
+          ['<=', ['coalesce', ['get', 'rank'], 99], 4],
           14,
           true,
         ],
       ],
       layout: {
         'icon-image': 'mountain_11',
-        'icon-size': 0.9,
+        'icon-size': ['interpolate', ['linear'], ['zoom'], 8.5, 0.8, 12, 0.95],
         'icon-padding': 16,
         'text-anchor': 'top',
         'text-field': [
@@ -1342,8 +1313,8 @@ export function getDenseVectorStyle(offline = false): maplibregl.StyleSpecificat
         'text-font': ['Noto Sans Italic'],
         'text-max-width': 8,
         'text-offset': [0, 0.55],
-        'text-size': ['interpolate', ['linear'], ['zoom'], 11, 10, 14, 11.5],
-        'text-padding': 32,
+        'text-size': ['interpolate', ['linear'], ['zoom'], 8.5, 9.5, 11, 10.5, 14, 11.5],
+        'text-padding': 28,
       },
       paint: {
         'text-color': '#7c2d12',
@@ -1616,62 +1587,26 @@ export function getOpenCycleMapVectorStyle(isLight = true): maplibregl.StyleSpec
     baseLayers.push(parkLabelLayer);
   }
 
-  // In Light mode, place thinner cycle route lines on top of road and bridge fills (before boundary_3).
-  // In Dense mode, insert wider route highlight bands underneath road fills (before highway-path).
-  const routeInsertAnchorId = isLight ? 'boundary_3' : 'highway-path';
-  const routeInsertIdx = baseLayers.findIndex((l) => l.id === routeInsertAnchorId);
+  // Place cycle route halo underneath road fills (before highway-path) and thin opaque core above road and bridge fills (before boundary_3).
   const routeLayers = buildCycleRouteHighlightLayers();
-  if (isLight) {
-    const softenHex = (hex: string, weight = 0.75): string => {
-      if (!hex.startsWith('#') || hex.length !== 7) return hex;
-      const r = Math.round(parseInt(hex.slice(1, 3), 16) * weight + 251 * (1 - weight));
-      const g = Math.round(parseInt(hex.slice(3, 5), 16) * weight + 250 * (1 - weight));
-      const b = Math.round(parseInt(hex.slice(5, 7), 16) * weight + 248 * (1 - weight));
-      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-    };
-    const thinWidthById: Record<string, any[]> = {
-      'ocm-route-mtb': ['interpolate', ['exponential', 1.3], ['zoom'], 8, 1.1, 12, 2.0, 14, 2.8, 16, 4.0, 18, 5.5],
-      'ocm-route-lcn': ['interpolate', ['exponential', 1.3], ['zoom'], 8, 1.2, 12, 2.2, 14, 3.0, 16, 4.2, 18, 5.8],
-      'ocm-route-lcn-proposed': ['interpolate', ['exponential', 1.3], ['zoom'], 9, 1.2, 12, 2.0, 14, 2.8, 16, 4.0, 18, 5.5],
-      'ocm-route-rcn': ['interpolate', ['exponential', 1.3], ['zoom'], 7, 1.1, 10, 1.7, 12, 2.4, 14, 3.3, 16, 4.6, 18, 6.2],
-      'ocm-route-rcn-proposed': ['interpolate', ['exponential', 1.3], ['zoom'], 8, 1.2, 12, 2.2, 14, 3.0, 16, 4.2, 18, 5.8],
-      'ocm-route-ncn': ['interpolate', ['exponential', 1.3], ['zoom'], 5, 0.9, 8, 1.4, 11, 2.1, 13, 3.0, 15, 4.2, 18, 6.6],
-      'ocm-route-ncn-proposed': ['interpolate', ['exponential', 1.3], ['zoom'], 7, 1.1, 12, 2.3, 14, 3.2, 16, 4.5, 18, 6.2],
-    };
-    for (const layer of routeLayers) {
-      if (layer.paint) {
-        layer.paint['line-opacity'] = 1;
-        if (thinWidthById[layer.id]) {
-          layer.paint['line-width'] = thinWidthById[layer.id];
-        }
-        const colorExpr = layer.paint['line-color'];
-        if (Array.isArray(colorExpr)) {
-          layer.paint['line-color'] = colorExpr.map((item) =>
-            typeof item === 'string' && item.startsWith('#') ? softenHex(item) : item,
-          );
-        } else if (typeof colorExpr === 'string' && colorExpr.startsWith('#')) {
-          layer.paint['line-color'] = softenHex(colorExpr);
-        }
-      }
-    }
-  }
-  if (routeInsertIdx >= 0) {
-    baseLayers.splice(routeInsertIdx, 0, ...routeLayers);
+  const haloRouteLayers = routeLayers.filter((l) => !String(l.id).endsWith('-core'));
+  const coreRouteLayers = routeLayers.filter((l) => String(l.id).endsWith('-core'));
+  const roadFillIdx = baseLayers.findIndex((l) => l.id === 'highway-path');
+  if (roadFillIdx >= 0) {
+    baseLayers.splice(roadFillIdx, 0, ...haloRouteLayers);
   } else {
-    baseLayers.push(...routeLayers);
+    baseLayers.push(...haloRouteLayers);
+  }
+  const routeInsertIdx = baseLayers.findIndex((l) => l.id === 'boundary_3');
+  if (routeInsertIdx >= 0) {
+    baseLayers.splice(routeInsertIdx, 0, ...coreRouteLayers);
+  } else {
+    baseLayers.push(...coreRouteLayers);
   }
 
   // Insert cycle route ref labels alongside road labels
   const roadLabelIdx = baseLayers.findIndex((l) => l.id === 'highway-name-major');
   const routeLabelLayers = buildCycleRouteLabelLayers();
-  if (isLight) {
-    for (const layer of routeLabelLayers) {
-      if (layer.paint) {
-        layer.paint['icon-opacity'] = 0.8;
-        layer.paint['text-opacity'] = 0.85;
-      }
-    }
-  }
   if (roadLabelIdx >= 0) {
     baseLayers.splice(roadLabelIdx + 1, 0, ...routeLabelLayers);
   } else {

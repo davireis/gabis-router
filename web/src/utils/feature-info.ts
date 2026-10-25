@@ -2,8 +2,10 @@ import type { MenuBadge, MenuHeaderInfo } from '../menu.ts';
 import type { PointWayInfo } from '../types.ts';
 import {
   classifyNoiseSubclass,
+  classifySpeedLimit,
   classifyTrafficSubclass,
   NOISE_SUB_META,
+  SPEED_LIMIT_META,
   TRAFFIC_SUB_META,
 } from './classification.ts';
 
@@ -329,17 +331,20 @@ export function formatPointWayTags(
   }
 
   const trafSub = classifyTrafficSubclass(info.traffic_class, info.highway);
-  if (trafSub === 'traffic_free') {
-    tags.push('Traffic: Car-free');
-  } else if (trafSub !== 'untagged_road') {
+  if (trafSub !== 'class_0') {
     const shortLabel = TRAFFIC_SUB_META[trafSub].label.replace(/^Class (\d+) \((.+)\)$/, '$2 ($1/7)');
     tags.push(`Traffic: ${shortLabel}`);
   }
 
   const noiseSub = classifyNoiseSubclass(info.noise_class);
-  if (noiseSub !== 'untagged') {
+  if (noiseSub !== 'class_0') {
     const shortLabel = NOISE_SUB_META[noiseSub].label.replace(/^Class (\d+) \((.+)\)$/, '$2 ($1/6)');
     tags.push(`Noise: ${shortLabel}`);
+  }
+
+  const speedCat = classifySpeedLimit(info.maxspeed, info.highway);
+  if (speedCat !== 'car_free' && speedCat !== 'untagged') {
+    tags.push(`Limit: ${SPEED_LIMIT_META[speedCat].label} mph`);
   }
 
   return tags;

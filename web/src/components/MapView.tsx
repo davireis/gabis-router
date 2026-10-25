@@ -25,6 +25,7 @@ import {
 import { tilePickerControl } from '../tile-picker.ts';
 import { centerRouteControl } from '../center-control.ts';
 import { legendControl } from '../legend-control.ts';
+import { terrain3DControl } from '../terrain-control.ts';
 import { loadedPMTiles, archivesReady } from '../hooks/useOffline.ts';
 import { CYCLE_ROUTES_ARCHIVE, MAP_TILES_CACHE_NAME, segmentsForTile } from '../segment-cache.ts';
 import { getMapTileDownloadUrl } from '../platform.ts';
@@ -331,6 +332,8 @@ export const MapView: React.FC<MapViewProps> = ({
     map.addControl(tilePickerControl, 'top-right');
     tilePickerControl.setOffline(isOfflineMode);
     map.addControl(legendControl, 'top-right');
+    map.addControl(terrain3DControl, 'top-right');
+    terrain3DControl.setOffline(isOfflineMode);
     map.addControl(centerRouteControl, 'top-right');
     map.addControl(new maplibregl.AttributionControl({ compact: false }), 'bottom-right');
 
@@ -346,6 +349,7 @@ export const MapView: React.FC<MapViewProps> = ({
       styleReadyRef.current = true;
       registerCycleShieldImages(map);
       drawAllLayers();
+      terrain3DControl.syncWithStyle(map);
       if (pendingFitRouteRef.current) {
         pendingFitRouteRef.current = false;
         fitRouteBounds(map, slotsRef.current, waypointsRef.current, false);
@@ -476,17 +480,9 @@ export const MapView: React.FC<MapViewProps> = ({
         {
           label: 'End here',
           hint: 'B',
-          onSelect: () => onAddWaypointRef.current(pointWithCachedName(), 'end'),
+          onSelect: () => onAddWaypointRef.current(pointWithCachedName(), 'append'),
         },
       ];
-
-      if (wps.length >= 2) {
-        items.push({
-          label: 'Extend destination',
-          hint: '+B',
-          onSelect: () => onAddWaypointRef.current(pointWithCachedName(), 'append'),
-        });
-      }
 
       items.push(
         {
@@ -838,6 +834,10 @@ export const MapView: React.FC<MapViewProps> = ({
       prev.basemap === basemap &&
       prev.thunderforestKey === thunderforestKey
     ) {
+      if (import.meta.env.DEV) {
+        registerCycleShieldImages(map);
+        map.triggerRepaint();
+      }
       return;
     }
     prevStylePropsRef.current = { isOfflineMode, basemap, thunderforestKey };
@@ -846,6 +846,7 @@ export const MapView: React.FC<MapViewProps> = ({
     registerProtocols();
     map.setMaxBounds(isOfflineMode ? UK_BOUNDS : null);
     tilePickerControl.setOffline(isOfflineMode);
+    terrain3DControl.setOffline(isOfflineMode);
     legendControl.syncBasemap(basemap);
     map.setStyle(
       isOfflineMode ? getOfflineStyle(basemap) : getOnlineStyle(basemap, thunderforestKey),

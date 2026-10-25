@@ -12,6 +12,7 @@ import {
   classifyNoise,
   classifyNoiseSubclass,
   classifySpeedLimit,
+  buildCostBreakdown,
   SURFACE_META,
   SURFACE_SUB_META,
   ROAD_GROUP_META,
@@ -85,7 +86,11 @@ function StackedBarRow<T extends string, S extends string = T>({
         sTotals[subCat] = (sTotals[subCat] || 0) + len;
       }
 
-      if (m.length > 0 && m[m.length - 1].category === cat) {
+      if (
+        m.length > 0 &&
+        m[m.length - 1].category === cat &&
+        m[m.length - 1].subCategory === subCat
+      ) {
         m[m.length - 1].to = s.to;
       } else {
         m.push({ from: s.from, to: s.to, category: cat, subCategory: subCat });
@@ -201,7 +206,7 @@ function StackedBarRow<T extends string, S extends string = T>({
           {cats.map((cat) => {
             const dist = categoryTotals[cat] || 0;
             const pct = Math.round((dist / totalDist) * 100);
-            if (pct < 1 && dist < 100) return null;
+            if (pct < 1) return null;
             const itemKey = `${rowKey}:${cat}`;
             const isPinned = pinnedKey === itemKey || expandedParent === cat;
             const childSubs = subMeta
@@ -363,6 +368,8 @@ export const SurfaceBreakdown: React.FC<SurfaceBreakdownProps> = ({
     [onHighlightSegment],
   );
 
+  const costBreakdown = useMemo(() => buildCostBreakdown(segments), [segments]);
+
   if (!profile || segments.length === 0) return null;
   const total = profile.dist[profile.dist.length - 1] || 1;
   const domId = slotIdx === 0 ? 'surface-section' : `surface-section-${slotIdx}`;
@@ -372,7 +379,7 @@ export const SurfaceBreakdown: React.FC<SurfaceBreakdownProps> = ({
       <StackedBarRow
         rowKey="surface"
         title="Surface"
-        tooltip="OpenStreetMap surface=* classes. Click any class chip below to expand its individual OSM surface=* subclasses."
+        tooltip="OpenStreetMap surface=* classes: Paved (asphalt, paved, concrete), Cobbles (paving_stones, sett, cobblestone), Unpaved (compacted, gravel, dirt, grass, mud, wood), and Untagged. Click any class chip to expand its subclasses."
         ariaLabel="Surface types"
         totalDist={total}
         segments={segments}
@@ -389,7 +396,7 @@ export const SurfaceBreakdown: React.FC<SurfaceBreakdownProps> = ({
       <StackedBarRow
         rowKey="road"
         title="Road Type"
-        tooltip="OpenStreetMap highway=* classes grouped into Cycleways & Paths, Tracks, Quiet & Minor Roads, Main Roads, and Arterial Roads. Click any class chip below to expand its individual highway=* subclasses."
+        tooltip="OpenStreetMap highway=* classes: Paths (cycleway, footway, path, bridleway, pedestrian), Tracks (highway=track), Minor (residential, service, unclassified), Main (tertiary, secondary), and Arterial (primary, trunk). Click any class chip to expand its subclasses."
         ariaLabel="Road types"
         totalDist={total}
         segments={segments}
@@ -406,7 +413,7 @@ export const SurfaceBreakdown: React.FC<SurfaceBreakdownProps> = ({
       <StackedBarRow
         rowKey="traffic"
         title="Traffic"
-        tooltip="Estimated motor vehicle volume from BRouter estimated_traffic_class=1..6 and OSM highway=* hierarchy. Click any class chip below to expand its individual traffic subclasses."
+        tooltip="Estimated motor vehicle volume from BRouter estimated_traffic_class=0..7: Quiet (classes 0–3, where 0 is unmodelled paths and local roads), Busy (classes 4–5), and Heavy (classes 6–7). Click any class chip to expand its subclasses."
         ariaLabel="Traffic levels"
         totalDist={total}
         segments={segments}
@@ -422,9 +429,9 @@ export const SurfaceBreakdown: React.FC<SurfaceBreakdownProps> = ({
       />
       <StackedBarRow
         rowKey="noise"
-        title="Noise &amp; pollution"
-        tooltip="Modeled noise and air pollution exposure from BRouter estimated_noise_class=1..6. Click any class chip below to expand its individual noise subclasses."
-        ariaLabel="Noise and pollution levels"
+        title="Noise"
+        tooltip="Modeled noise exposure from BRouter estimated_noise_class=0..6: Quiet (classes 0–2, where 0 is unmodelled outside the 64 m noise buffer of major roads), Moderate (classes 3–4), and Loud (classes 5–6). Click any class chip to expand its subclasses."
+        ariaLabel="Noise levels"
         totalDist={total}
         segments={segments}
         classifier={(s) => classifyNoise(s.noise)}
@@ -439,13 +446,30 @@ export const SurfaceBreakdown: React.FC<SurfaceBreakdownProps> = ({
       />
       <StackedBarRow
         rowKey="speed"
-        title="Speed Limit"
-        tooltip="Posted motor vehicle speed limits along the route, plus car-free tracks and cycle paths."
-        ariaLabel="Speed limits"
+        title="Limit (mph)"
+        tooltip="Posted motor vehicle speed limits (mph) from OpenStreetMap maxspeed=* tags, plus car-free tracks and cycle paths."
+        ariaLabel="Speed limits in mph"
         totalDist={total}
         segments={segments}
         classifier={(s) => classifySpeedLimit(s.maxspeed, s.highway)}
         meta={SPEED_LIMIT_META}
+        profile={profile}
+        pinnedKey={pinned?.key ?? null}
+        onTogglePin={handleTogglePin}
+        onHover={onHover}
+        onHighlightSegment={handleHighlight}
+      />
+      <StackedBarRow
+        rowKey="cost"
+        title="Cost (×)"
+        tooltip="BRouter way cost factor multiplier ([1, 1.5], (1.5, 2], (2, 3], (3, ∞)). 1.0× equals an ideal road or path; hover any segment to see its exact multiplier or click a class chip to inspect its exact cost subclasses."
+        ariaLabel="Cost factor breakdown"
+        totalDist={total}
+        segments={segments}
+        classifier={costBreakdown.classifier}
+        meta={costBreakdown.meta}
+        subClassifier={costBreakdown.subClassifier}
+        subMeta={costBreakdown.subMeta}
         profile={profile}
         pinnedKey={pinned?.key ?? null}
         onTogglePin={handleTogglePin}

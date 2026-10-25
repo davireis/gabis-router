@@ -813,8 +813,6 @@ export function useRouting(isOfflineMode: boolean) {
       let next: LatLon[];
       if (action === 'start') {
         next = wps.length === 0 ? [p] : [p, ...wps.slice(1)];
-      } else if (action === 'end') {
-        next = wps.length < 2 ? [...wps, p] : [...wps.slice(0, -1), p];
       } else if (action === 'via') {
         if (wps.length < 2) {
           next = [...wps, p];

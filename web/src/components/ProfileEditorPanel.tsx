@@ -613,7 +613,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
             </summary>
             <div className="pe-section-content">
               <div className="pe-subsection-header">
-                <span>2a. Arterial Roads (trunk, primary)</span>
+                <span>2a. Arterial (trunk, primary)</span>
                 <span className="pe-section-badge pe-badge-a">+0–10</span>
               </div>
               <SliderRow
@@ -642,7 +642,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
               />
 
               <div className="pe-subsection-header pe-subsection-divider">
-                <span>2b. Main Roads (secondary, tertiary)</span>
+                <span>2b. Main (secondary, tertiary)</span>
                 <span className="pe-section-badge pe-badge-a">+0–10</span>
               </div>
               <SliderRow
@@ -671,7 +671,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
               />
 
               <div className="pe-subsection-header pe-subsection-divider">
-                <span>2c. Quiet &amp; Minor Roads (unclassified, residential, service)</span>
+                <span>2c. Minor (unclassified, residential, service)</span>
                 <span className="pe-section-badge pe-badge-a">+0–10</span>
               </div>
               <SliderRow
@@ -712,7 +712,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
               />
 
               <div className="pe-subsection-header pe-subsection-divider">
-                <span>2d. Cycleways &amp; Paths (cycleway, path, footway, bridleway, pedestrian)</span>
+                <span>2d. Paths (cycleway, path, footway, bridleway, pedestrian)</span>
                 <span className="pe-section-badge pe-badge-a">+0–20</span>
               </div>
               <SliderRow
@@ -873,11 +873,11 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
             </summary>
             <div className={`pe-section-content ${!axes.enableSurfacePenalties ? 'pe-content-disabled' : ''}`}>
               <div className="pe-subsection-note">
-                Organized into the same 6 Surface classes and 16 subclasses shown in the Route Summary. Click any Surface chip in the Route Summary to inspect its subclasses along the route.
+                Organized into the same 4 Surface classes (<code>Paved</code>, <code>Cobbles</code>, <code>Unpaved</code>, <code>Untagged</code>) and 16 subclasses shown in the Route Summary. Click any Surface chip in the Route Summary to inspect its subclasses along the route.
               </div>
 
               <div className="pe-subsection-header">
-                <span>3a. Smooth Paved (asphalt, paved, concrete)</span>
+                <span>3a. Paved (asphalt, paved, concrete)</span>
                 <span className="pe-section-badge pe-badge-a">+0–15</span>
               </div>
               <SliderRow
@@ -918,7 +918,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
               />
 
               <div className="pe-subsection-header pe-subsection-divider">
-                <span>3b. Paving &amp; Cobbles (paving_stones, sett, cobblestone)</span>
+                <span>3b. Cobbles (paving_stones, sett, cobblestone)</span>
                 <span className="pe-section-badge pe-badge-a">+0–15</span>
               </div>
               <SliderRow
@@ -959,7 +959,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
               />
 
               <div className="pe-subsection-header pe-subsection-divider">
-                <span>3c. Compacted (compacted, fine_gravel)</span>
+                <span>3c. Unpaved (compacted, gravel, dirt, grass, mud, wood)</span>
                 <span className="pe-section-badge pe-badge-a">+0–15</span>
               </div>
               <SliderRow
@@ -986,11 +986,6 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 tooltip="Additive penalty (+0.0 = no penalty) when OSM surface=fine_gravel: small crushed stone grit or fine aggregate."
                 onChange={(v) => handleAxisChange('fineGravelPenalty', v)}
               />
-
-              <div className="pe-subsection-header pe-subsection-divider">
-                <span>3d. Gravel (gravel, pebblestone)</span>
-                <span className="pe-section-badge pe-badge-a">+0–15</span>
-              </div>
               <SliderRow
                 id="pe-surf-gravel"
                 label="Gravel (surface=gravel)"
@@ -1015,14 +1010,9 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 tooltip="Additive penalty (+0.0 = no penalty) when OSM surface=pebblestone: loose rounded pebbles or shingle."
                 onChange={(v) => handleAxisChange('pebblestonePenalty', v)}
               />
-
-              <div className="pe-subsection-header pe-subsection-divider">
-                <span>3e. Unpaved &amp; Natural (unpaved, dirt, grass, mud, wood)</span>
-                <span className="pe-section-badge pe-badge-a">+0–15</span>
-              </div>
               <SliderRow
                 id="pe-surf-unpaved"
-                label="Unpaved / Dirt / Earth (surface=unpaved|ground|dirt|earth)"
+                label="Dirt / Earth (surface=unpaved|ground|dirt|earth)"
                 value={axes.unpavedPenalty}
                 min={0.0}
                 max={15.0}
@@ -1041,7 +1031,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 step={0.1}
                 formatValue={(v) => `+${Number(v.toFixed(1))}`}
                 disallowable
-                tooltip="Additive penalty (+0.0 = no penalty) when OSM surface=grass, grass_paver, artificial_turf, or tartan."
+                tooltip="Additive penalty (+0.0 = no penalty) when OSM surface=grass, grass_paver, or artificial_turf."
                 onChange={(v) => handleAxisChange('grassPenalty', v)}
               />
               <SliderRow
@@ -1070,7 +1060,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
               />
 
               <div className="pe-subsection-header pe-subsection-divider">
-                <span>3f. Untagged Surface (surface= missing)</span>
+                <span>3d. Untagged (surface= missing)</span>
                 <span className="pe-section-badge pe-badge-a">+0–15</span>
               </div>
               <SliderRow
@@ -1118,8 +1108,20 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
             </summary>
             <div className={`pe-section-content ${!axes.enableTrafficPenalties ? 'pe-content-disabled' : ''}`}>
               <div className="pe-subsection-note">
-                Heuristic estimate computed by BRouter on <code>primary</code>, <code>secondary</code>, and <code>tertiary</code> roads (<code>1–6</code>), plus <code>7</code> on untagged <code>trunk</code>/<code>motorway</code> roads. Subclasses align with the Route Summary Traffic bar: Quiet (<code>1–2</code>), Moderate (<code>3</code>), Busy (<code>4–5</code>), Severe (<code>6–7</code>), and Untagged (minor roads such as <code>residential</code>/<code>unclassified</code>).
+                Heuristic estimate computed by BRouter on <code>primary</code>, <code>secondary</code>, and <code>tertiary</code> roads (<code>1–6</code>), plus <code>7</code> on untagged <code>trunk</code>/<code>motorway</code> roads. Subclasses align with the Route Summary Traffic bar: Quiet (<code>0–3</code>, including Class 0 unmodelled minor roads), Busy (<code>4–5</code>), and Heavy (<code>6–7</code>).
               </div>
+              <SliderRow
+                id="pe-traffic-untagged"
+                label="Class 0: Unmodelled (Quiet, minor roads without traffic tag)"
+                value={axes.trafficUntaggedRoadPenalty}
+                min={0.0}
+                max={10.0}
+                step={0.1}
+                disallowable
+                formatValue={(v) => `+${Number(v.toFixed(1))}`}
+                tooltip="Additive penalty per metre when a motor road (is_road, typically residential, unclassified, or service) has no estimated_traffic_class tag in the RD5 tile."
+                onChange={(v) => handleAxisChange('trafficUntaggedRoadPenalty', v)}
+              />
               <SliderRow
                 id="pe-traffic-c1"
                 label="Class 1: Very quiet (Quiet, estimated_traffic_class=1)"
@@ -1146,43 +1148,43 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
               />
               <SliderRow
                 id="pe-traffic-c3"
-                label="Class 3: Moderate (Moderate, estimated_traffic_class=3)"
+                label="Class 3: Fair (Quiet, estimated_traffic_class=3)"
                 value={axes.trafficClass3Penalty}
                 min={0.0}
                 max={10.0}
                 step={0.1}
                 disallowable
                 formatValue={(v) => `+${Number(v.toFixed(1))}`}
-                tooltip="Additive penalty per metre on roads with BRouter estimated_traffic_class=3 (moderate traffic flow)."
+                tooltip="Additive penalty per metre on roads with BRouter estimated_traffic_class=3 (fair traffic flow)."
                 onChange={(v) => handleAxisChange('trafficClass3Penalty', v)}
               />
               <SliderRow
                 id="pe-traffic-c4"
-                label="Class 4: Busy (Busy, estimated_traffic_class=4)"
+                label="Class 4: Moderate (Busy, estimated_traffic_class=4)"
                 value={axes.trafficClass4Penalty}
                 min={0.0}
                 max={10.0}
                 step={0.1}
                 disallowable
                 formatValue={(v) => `+${Number(v.toFixed(1))}`}
-                tooltip="Additive penalty per metre on roads with BRouter estimated_traffic_class=4 (busy distributor or arterial traffic)."
+                tooltip="Additive penalty per metre on roads with BRouter estimated_traffic_class=4 (moderate distributor or arterial traffic)."
                 onChange={(v) => handleAxisChange('trafficClass4Penalty', v)}
               />
               <SliderRow
                 id="pe-traffic-c5"
-                label="Class 5: Heavy (Busy, estimated_traffic_class=5)"
+                label="Class 5: Busy (Busy, estimated_traffic_class=5)"
                 value={axes.trafficClass5Penalty}
                 min={0.0}
                 max={10.0}
                 step={0.1}
                 disallowable
                 formatValue={(v) => `+${Number(v.toFixed(1))}`}
-                tooltip="Additive penalty per metre on roads with BRouter estimated_traffic_class=5 (heavy traffic)."
+                tooltip="Additive penalty per metre on roads with BRouter estimated_traffic_class=5 (busy traffic)."
                 onChange={(v) => handleAxisChange('trafficClass5Penalty', v)}
               />
               <SliderRow
                 id="pe-traffic-c6"
-                label="Class 6: Very heavy (Severe, estimated_traffic_class=6 — busiest A/B roads)"
+                label="Class 6: Heavy (Heavy, estimated_traffic_class=6 — busiest A/B roads)"
                 value={axes.trafficClass6Penalty}
                 min={0.0}
                 max={10.0}
@@ -1194,7 +1196,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
               />
               <SliderRow
                 id="pe-traffic-c7"
-                label="Class 7: Extreme (Severe, estimated_traffic_class=7 / untagged trunk)"
+                label="Class 7: Extreme (Heavy, estimated_traffic_class=7 / untagged trunk)"
                 value={axes.trafficClass7Penalty}
                 min={0.0}
                 max={10.0}
@@ -1203,18 +1205,6 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 formatValue={(v) => `+${Number(v.toFixed(1))}`}
                 tooltip="Additive penalty per metre on roads with BRouter estimated_traffic_class=7 or untagged highway=trunk / motorway roads."
                 onChange={(v) => handleAxisChange('trafficClass7Penalty', v)}
-              />
-              <SliderRow
-                id="pe-traffic-untagged"
-                label="Untagged traffic on motor roads (residential, unclassified, service)"
-                value={axes.trafficUntaggedRoadPenalty}
-                min={0.0}
-                max={10.0}
-                step={0.1}
-                disallowable
-                formatValue={(v) => `+${Number(v.toFixed(1))}`}
-                tooltip="Additive penalty per metre when a motor road (is_road, typically residential, unclassified, or service) has no estimated_traffic_class tag in the RD5 tile."
-                onChange={(v) => handleAxisChange('trafficUntaggedRoadPenalty', v)}
               />
             </div>
           </details>
@@ -1237,84 +1227,84 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
             </summary>
             <div className={`pe-section-content ${!axes.enableNoisePenalties ? 'pe-content-disabled' : ''}`}>
               <div className="pe-subsection-note">
-                Heuristic road-noise exposure class (<code>1–6</code>) precomputed by BRouter from nearby motorways, trunk roads, and primary roads. Subclasses align with the Route Summary Noise bar: Quiet (<code>1–2</code>), Moderate (<code>3–4</code>), Loud (<code>5–6</code>), and Untagged.
+                Heuristic road-noise exposure class (<code>0–6</code>) precomputed by BRouter from 64 m buffers around motorways, trunk, primary, and secondary roads. Subclasses align with the Route Summary Noise bar: Quiet (<code>0–2</code>), Moderate (<code>3–4</code>), and Loud (<code>5–6</code>).
               </div>
               <SliderRow
-                id="pe-noise-c1"
-                label="Class 1: Very quiet (Low Noise, estimated_noise_class=1)"
-                value={axes.noiseClass1Penalty}
-                min={0.0}
-                max={3.0}
-                step={0.1}
-                formatValue={(v) => `+${Number(v.toFixed(1))}`}
-                tooltip="Additive penalty per metre on ways with BRouter estimated_noise_class=1."
-                onChange={(v) => handleAxisChange('noiseClass1Penalty', v)}
-              />
-              <SliderRow
-                id="pe-noise-c2"
-                label="Class 2: Quiet (Low Noise, estimated_noise_class=2)"
-                value={axes.noiseClass2Penalty}
-                min={0.0}
-                max={3.0}
-                step={0.1}
-                formatValue={(v) => `+${Number(v.toFixed(1))}`}
-                tooltip="Additive penalty per metre on ways with BRouter estimated_noise_class=2."
-                onChange={(v) => handleAxisChange('noiseClass2Penalty', v)}
-              />
-              <SliderRow
-                id="pe-noise-c3"
-                label="Class 3: Moderate (Moderate Noise, estimated_noise_class=3)"
-                value={axes.noiseClass3Penalty}
-                min={0.0}
-                max={3.0}
-                step={0.1}
-                formatValue={(v) => `+${Number(v.toFixed(1))}`}
-                tooltip="Additive penalty per metre on ways with BRouter estimated_noise_class=3."
-                onChange={(v) => handleAxisChange('noiseClass3Penalty', v)}
-              />
-              <SliderRow
-                id="pe-noise-c4"
-                label="Class 4: Noticeable (High Noise, estimated_noise_class=4)"
-                value={axes.noiseClass4Penalty}
-                min={0.0}
-                max={3.0}
-                step={0.1}
-                formatValue={(v) => `+${Number(v.toFixed(1))}`}
-                tooltip="Additive penalty per metre on ways with BRouter estimated_noise_class=4."
-                onChange={(v) => handleAxisChange('noiseClass4Penalty', v)}
-              />
-              <SliderRow
-                id="pe-noise-c5"
-                label="Class 5: Loud (Very High Noise, estimated_noise_class=5)"
-                value={axes.noiseClass5Penalty}
-                min={0.0}
-                max={3.0}
-                step={0.1}
-                formatValue={(v) => `+${Number(v.toFixed(1))}`}
-                tooltip="Additive penalty per metre on ways with BRouter estimated_noise_class=5."
-                onChange={(v) => handleAxisChange('noiseClass5Penalty', v)}
-              />
-              <SliderRow
-                id="pe-noise-c6"
-                label="Class 6: Very loud (Very High Noise, estimated_noise_class=6)"
-                value={axes.noiseClass6Penalty}
-                min={0.0}
-                max={3.0}
-                step={0.1}
-                formatValue={(v) => `+${Number(v.toFixed(1))}`}
-                tooltip="Additive penalty per metre on ways with BRouter estimated_noise_class=6 (highest noise exposure)."
-                onChange={(v) => handleAxisChange('noiseClass6Penalty', v)}
-              />
-              <SliderRow
                 id="pe-noise-untagged"
-                label="Untagged noise (estimated_noise_class= missing)"
+                label="Class 0: Unmodelled (Quiet, estimated_noise_class=)"
                 value={axes.noiseUntaggedPenalty}
                 min={0.0}
                 max={3.0}
                 step={0.1}
                 formatValue={(v) => `+${Number(v.toFixed(1))}`}
-                tooltip="Additive penalty per metre when a way has no estimated_noise_class tag (typically quiet ways far from major roads)."
+                tooltip="Additive penalty per metre when a way is outside the 64 m noise buffer of any major road (estimated_noise_class= is empty, i.e. zero modelled road noise)."
                 onChange={(v) => handleAxisChange('noiseUntaggedPenalty', v)}
+              />
+              <SliderRow
+                id="pe-noise-c1"
+                label="Class 1: Very quiet (Quiet, estimated_noise_class=1)"
+                value={axes.noiseClass1Penalty}
+                min={0.0}
+                max={3.0}
+                step={0.1}
+                formatValue={(v) => `+${Number(v.toFixed(1))}`}
+                tooltip="Additive penalty per metre on ways with BRouter estimated_noise_class=1 (< 10% noise buffer overlap)."
+                onChange={(v) => handleAxisChange('noiseClass1Penalty', v)}
+              />
+              <SliderRow
+                id="pe-noise-c2"
+                label="Class 2: Quiet (Quiet, estimated_noise_class=2)"
+                value={axes.noiseClass2Penalty}
+                min={0.0}
+                max={3.0}
+                step={0.1}
+                formatValue={(v) => `+${Number(v.toFixed(1))}`}
+                tooltip="Additive penalty per metre on ways with BRouter estimated_noise_class=2 (10–25% noise buffer overlap)."
+                onChange={(v) => handleAxisChange('noiseClass2Penalty', v)}
+              />
+              <SliderRow
+                id="pe-noise-c3"
+                label="Class 3: Moderate (Moderate, estimated_noise_class=3)"
+                value={axes.noiseClass3Penalty}
+                min={0.0}
+                max={3.0}
+                step={0.1}
+                formatValue={(v) => `+${Number(v.toFixed(1))}`}
+                tooltip="Additive penalty per metre on ways with BRouter estimated_noise_class=3 (25–40% noise buffer overlap)."
+                onChange={(v) => handleAxisChange('noiseClass3Penalty', v)}
+              />
+              <SliderRow
+                id="pe-noise-c4"
+                label="Class 4: Noticeable (Moderate, estimated_noise_class=4)"
+                value={axes.noiseClass4Penalty}
+                min={0.0}
+                max={3.0}
+                step={0.1}
+                formatValue={(v) => `+${Number(v.toFixed(1))}`}
+                tooltip="Additive penalty per metre on ways with BRouter estimated_noise_class=4 (40–55% noise buffer overlap)."
+                onChange={(v) => handleAxisChange('noiseClass4Penalty', v)}
+              />
+              <SliderRow
+                id="pe-noise-c5"
+                label="Class 5: Loud (Loud, estimated_noise_class=5)"
+                value={axes.noiseClass5Penalty}
+                min={0.0}
+                max={3.0}
+                step={0.1}
+                formatValue={(v) => `+${Number(v.toFixed(1))}`}
+                tooltip="Additive penalty per metre on ways with BRouter estimated_noise_class=5 (55–80% noise buffer overlap)."
+                onChange={(v) => handleAxisChange('noiseClass5Penalty', v)}
+              />
+              <SliderRow
+                id="pe-noise-c6"
+                label="Class 6: Very loud (Loud, estimated_noise_class=6)"
+                value={axes.noiseClass6Penalty}
+                min={0.0}
+                max={3.0}
+                step={0.1}
+                formatValue={(v) => `+${Number(v.toFixed(1))}`}
+                tooltip="Additive penalty per metre on ways with BRouter estimated_noise_class=6 (≥ 80% noise buffer overlap)."
+                onChange={(v) => handleAxisChange('noiseClass6Penalty', v)}
               />
             </div>
           </details>

@@ -13,22 +13,15 @@ export interface SegmentData {
   noise?: number;
   traffic?: number;
   maxspeed?: number;
+  costfactor?: number;
 }
 
-export type SurfaceCategory =
-  | 'paved'
-  | 'cobblestone'
-  | 'compacted'
-  | 'gravel'
-  | 'unpaved'
-  | 'unknown';
+export type SurfaceCategory = 'paved' | 'cobblestone' | 'unpaved' | 'unknown';
 
 export const SURFACE_META: Record<SurfaceCategory, { label: string; color: string }> = {
-  paved: { label: 'Smooth Paved', color: '#10b981' },
-  cobblestone: { label: 'Paving & Cobbles', color: '#8b5cf6' },
-  compacted: { label: 'Compacted', color: '#eab308' },
-  gravel: { label: 'Gravel', color: '#f59e0b' },
-  unpaved: { label: 'Unpaved & Natural', color: '#b45309' },
+  paved: { label: 'Paved', color: '#10b981' },
+  cobblestone: { label: 'Cobbles', color: '#8b5cf6' },
+  unpaved: { label: 'Unpaved', color: '#f59e0b' },
   unknown: { label: 'Untagged', color: '#94a3b8' },
 };
 
@@ -55,21 +48,21 @@ export const SURFACE_SUB_META: Record<
   { label: string; parent: SurfaceCategory; color: string }
 > = {
   asphalt: { label: 'Asphalt', parent: 'paved', color: '#059669' },
-  paved: { label: 'Paved / Tarmac', parent: 'paved', color: '#10b981' },
+  paved: { label: 'Paved', parent: 'paved', color: '#10b981' },
   concrete: { label: 'Concrete', parent: 'paved', color: '#34d399' },
   paving_stones: { label: 'Paving stones', parent: 'cobblestone', color: '#a78bfa' },
   sett: { label: 'Sett', parent: 'cobblestone', color: '#8b5cf6' },
   cobblestone: { label: 'Cobblestone', parent: 'cobblestone', color: '#6d28d9' },
-  compacted: { label: 'Compacted', parent: 'compacted', color: '#eab308' },
-  fine_gravel: { label: 'Fine gravel', parent: 'compacted', color: '#ca8a04' },
-  gravel: { label: 'Gravel', parent: 'gravel', color: '#f59e0b' },
-  pebblestone: { label: 'Pebblestone', parent: 'gravel', color: '#d97706' },
-  unpaved: { label: 'Unpaved / Dirt / Earth', parent: 'unpaved', color: '#b45309' },
-  grass: { label: 'Grass / Grass paver', parent: 'unpaved', color: '#65a30d' },
-  mud_sand: { label: 'Mud / Sand / Clay', parent: 'unpaved', color: '#92400e' },
+  compacted: { label: 'Compacted', parent: 'unpaved', color: '#eab308' },
+  fine_gravel: { label: 'Fine gravel', parent: 'unpaved', color: '#ca8a04' },
+  gravel: { label: 'Gravel', parent: 'unpaved', color: '#f59e0b' },
+  pebblestone: { label: 'Pebblestone', parent: 'unpaved', color: '#d97706' },
+  unpaved: { label: 'Dirt / Earth', parent: 'unpaved', color: '#b45309' },
+  grass: { label: 'Grass', parent: 'unpaved', color: '#65a30d' },
+  mud_sand: { label: 'Mud / Sand', parent: 'unpaved', color: '#92400e' },
   wood_metal: { label: 'Wood / Metal', parent: 'unpaved', color: '#78716c' },
-  untagged_road: { label: 'Untagged (Motor Road)', parent: 'unknown', color: '#94a3b8' },
-  untagged_path: { label: 'Untagged (Path / Track)', parent: 'unknown', color: '#64748b' },
+  untagged_road: { label: 'Untagged road', parent: 'unknown', color: '#94a3b8' },
+  untagged_path: { label: 'Untagged path', parent: 'unknown', color: '#64748b' },
 };
 
 const MOTOR_ROAD_HIGHWAYS = new Set([
@@ -144,12 +137,12 @@ export type RoadGroupCategory =
   | 'unknown';
 
 export const ROAD_GROUP_META: Record<RoadGroupCategory, { label: string; color: string }> = {
-  cycleway_path: { label: 'Cycleways & Paths', color: '#06b6d4' },
+  cycleway_path: { label: 'Paths', color: '#06b6d4' },
   track: { label: 'Tracks', color: '#d97706' },
-  minor_road: { label: 'Quiet & Minor Roads', color: '#10b981' },
-  main_road: { label: 'Main Roads', color: '#eab308' },
-  arterial_road: { label: 'Arterial Roads', color: '#ef4444' },
-  unknown: { label: 'Unknown', color: '#94a3b8' },
+  minor_road: { label: 'Minor', color: '#10b981' },
+  main_road: { label: 'Main', color: '#eab308' },
+  arterial_road: { label: 'Arterial', color: '#ef4444' },
+  unknown: { label: 'Untagged', color: '#94a3b8' },
 };
 
 export type RoadCategory =
@@ -173,7 +166,7 @@ export const ROAD_META: Record<RoadCategory, { label: string; parent: RoadGroupC
   footway: { label: 'Footway', parent: 'cycleway_path', color: '#a855f7' },
   path: { label: 'Path', parent: 'cycleway_path', color: '#854d0e' },
   bridleway: { label: 'Bridleway', parent: 'cycleway_path', color: '#b45309' },
-  pedestrian: { label: 'Pedestrian / Steps', parent: 'cycleway_path', color: '#ec4899' },
+  pedestrian: { label: 'Pedestrian', parent: 'cycleway_path', color: '#ec4899' },
   track: { label: 'Track', parent: 'track', color: '#d97706' },
   residential: { label: 'Residential', parent: 'minor_road', color: '#10b981' },
   service: { label: 'Service', parent: 'minor_road', color: '#6ee7b7' },
@@ -182,7 +175,7 @@ export const ROAD_META: Record<RoadCategory, { label: string; parent: RoadGroupC
   secondary: { label: 'Secondary', parent: 'main_road', color: '#f97316' },
   primary: { label: 'Primary', parent: 'arterial_road', color: '#ef4444' },
   trunk: { label: 'Trunk', parent: 'arterial_road', color: '#991b1b' },
-  unknown: { label: 'Unknown', parent: 'unknown', color: '#94a3b8' },
+  unknown: { label: 'Untagged', parent: 'unknown', color: '#94a3b8' },
 };
 
 export function classifyRoad(highway?: string): RoadCategory {
@@ -207,54 +200,39 @@ export function classifyRoadGroup(highway?: string): RoadGroupCategory {
   return ROAD_META[classifyRoad(highway)].parent;
 }
 
-export type TrafficCategory =
-  | 'traffic_free'
-  | 'low'
-  | 'acceptable'
-  | 'heavy'
-  | 'severe'
-  | 'untagged';
+export type TrafficCategory = 'quiet' | 'busy' | 'heavy';
 
 export const TRAFFIC_META: Record<TrafficCategory, { label: string; color: string }> = {
-  traffic_free: { label: 'Traffic-free', color: '#059669' },
-  low: { label: 'Quiet (1–2)', color: '#10b981' },
-  acceptable: { label: 'Moderate (3)', color: '#eab308' },
-  heavy: { label: 'Busy (4–5)', color: '#f97316' },
-  severe: { label: 'Severe (6–7)', color: '#ef4444' },
-  untagged: { label: 'Untagged', color: '#94a3b8' },
+  quiet: { label: 'Quiet', color: '#10b981' },
+  busy: { label: 'Busy', color: '#f97316' },
+  heavy: { label: 'Heavy', color: '#ef4444' },
 };
 
 export type TrafficSubcategory =
-  | 'traffic_free'
+  | 'class_0'
   | 'class_1'
   | 'class_2'
   | 'class_3'
   | 'class_4'
   | 'class_5'
   | 'class_6'
-  | 'class_7'
-  | 'untagged_road';
+  | 'class_7';
 
 export const TRAFFIC_SUB_META: Record<
   TrafficSubcategory,
   { label: string; parent: TrafficCategory; color: string }
 > = {
-  traffic_free: { label: 'Car-free Path / Cycleway', parent: 'traffic_free', color: '#059669' },
-  class_1: { label: 'Class 1 (Very quiet)', parent: 'low', color: '#10b981' },
-  class_2: { label: 'Class 2 (Quiet)', parent: 'low', color: '#34d399' },
-  class_3: { label: 'Class 3 (Moderate)', parent: 'acceptable', color: '#eab308' },
-  class_4: { label: 'Class 4 (Busy)', parent: 'heavy', color: '#f59e0b' },
-  class_5: { label: 'Class 5 (Heavy)', parent: 'heavy', color: '#f97316' },
-  class_6: { label: 'Class 6 (Very heavy)', parent: 'severe', color: '#ef4444' },
-  class_7: { label: 'Class 7 (Extreme)', parent: 'severe', color: '#b91c1c' },
-  untagged_road: { label: 'Untagged (Motor Road)', parent: 'untagged', color: '#94a3b8' },
+  class_0: { label: 'Class 0 (Unmodelled)', parent: 'quiet', color: '#059669' },
+  class_1: { label: 'Class 1 (Very quiet)', parent: 'quiet', color: '#10b981' },
+  class_2: { label: 'Class 2 (Quiet)', parent: 'quiet', color: '#34d399' },
+  class_3: { label: 'Class 3 (Fair)', parent: 'quiet', color: '#84cc16' },
+  class_4: { label: 'Class 4 (Moderate)', parent: 'busy', color: '#f59e0b' },
+  class_5: { label: 'Class 5 (Busy)', parent: 'busy', color: '#f97316' },
+  class_6: { label: 'Class 6 (Heavy)', parent: 'heavy', color: '#ef4444' },
+  class_7: { label: 'Class 7 (Extreme)', parent: 'heavy', color: '#b91c1c' },
 };
 
 export function classifyTrafficSubclass(traffic?: number, highway?: string): TrafficSubcategory {
-  const h = (highway || '').toLowerCase().trim();
-  if (['cycleway', 'path', 'footway', 'pedestrian', 'bridleway', 'track', 'steps'].includes(h)) {
-    return 'traffic_free';
-  }
   const t = traffic || 0;
   if (t === 1) return 'class_1';
   if (t === 2) return 'class_2';
@@ -263,45 +241,45 @@ export function classifyTrafficSubclass(traffic?: number, highway?: string): Tra
   if (t === 5) return 'class_5';
   if (t === 6) return 'class_6';
   if (t >= 7) return 'class_7';
+  const h = (highway || '').toLowerCase().trim();
   if (['trunk', 'trunk_link', 'motorway', 'motorway_link'].includes(h)) {
     return 'class_7';
   }
-  return 'untagged_road';
+  return 'class_0';
 }
 
 export function classifyTraffic(traffic?: number, highway?: string): TrafficCategory {
   return TRAFFIC_SUB_META[classifyTrafficSubclass(traffic, highway)].parent;
 }
 
-export type NoiseCategory = 'very_quiet' | 'moderate' | 'loud' | 'untagged';
+export type NoiseCategory = 'very_quiet' | 'moderate' | 'loud';
 
 export const NOISE_META: Record<NoiseCategory, { label: string; color: string }> = {
-  very_quiet: { label: 'Quiet (1–2)', color: '#10b981' },
-  moderate: { label: 'Moderate (3–4)', color: '#eab308' },
-  loud: { label: 'Loud (5–6)', color: '#ef4444' },
-  untagged: { label: 'Untagged', color: '#94a3b8' },
+  very_quiet: { label: 'Quiet', color: '#10b981' },
+  moderate: { label: 'Moderate', color: '#eab308' },
+  loud: { label: 'Loud', color: '#ef4444' },
 };
 
 export type NoiseSubcategory =
+  | 'class_0'
   | 'class_1'
   | 'class_2'
   | 'class_3'
   | 'class_4'
   | 'class_5'
-  | 'class_6'
-  | 'untagged';
+  | 'class_6';
 
 export const NOISE_SUB_META: Record<
   NoiseSubcategory,
   { label: string; parent: NoiseCategory; color: string }
 > = {
+  class_0: { label: 'Class 0 (Unmodelled)', parent: 'very_quiet', color: '#059669' },
   class_1: { label: 'Class 1 (Very quiet)', parent: 'very_quiet', color: '#10b981' },
   class_2: { label: 'Class 2 (Quiet)', parent: 'very_quiet', color: '#34d399' },
   class_3: { label: 'Class 3 (Moderate)', parent: 'moderate', color: '#eab308' },
   class_4: { label: 'Class 4 (Noticeable)', parent: 'moderate', color: '#f59e0b' },
   class_5: { label: 'Class 5 (Loud)', parent: 'loud', color: '#f97316' },
   class_6: { label: 'Class 6 (Very loud)', parent: 'loud', color: '#ef4444' },
-  untagged: { label: 'Untagged (No noise estimate)', parent: 'untagged', color: '#94a3b8' },
 };
 
 export function classifyNoiseSubclass(noise?: number): NoiseSubcategory {
@@ -312,7 +290,7 @@ export function classifyNoiseSubclass(noise?: number): NoiseSubcategory {
   if (n === 4) return 'class_4';
   if (n === 5) return 'class_5';
   if (n >= 6) return 'class_6';
-  return 'untagged';
+  return 'class_0';
 }
 
 export function classifyNoise(noise?: number): NoiseCategory {
@@ -331,12 +309,12 @@ export type SpeedLimitCategory =
 
 export const SPEED_LIMIT_META: Record<SpeedLimitCategory, { label: string; color: string }> = {
   car_free: { label: 'Car-free', color: '#059669' },
-  '20mph': { label: '20 mph', color: '#10b981' },
-  '30mph': { label: '30 mph', color: '#84cc16' },
-  '40mph': { label: '40 mph', color: '#eab308' },
-  '50mph': { label: '50 mph', color: '#f97316' },
-  '60mph': { label: '60 mph', color: '#ef4444' },
-  '70mph': { label: '70 mph', color: '#991b1b' },
+  '20mph': { label: '20', color: '#10b981' },
+  '30mph': { label: '30', color: '#84cc16' },
+  '40mph': { label: '40', color: '#eab308' },
+  '50mph': { label: '50', color: '#f97316' },
+  '60mph': { label: '60', color: '#ef4444' },
+  '70mph': { label: '70', color: '#991b1b' },
   untagged: { label: 'Untagged', color: '#94a3b8' },
 };
 
@@ -359,4 +337,59 @@ export function classifySpeedLimit(maxspeed?: number, highway?: string): SpeedLi
   }
 
   return 'untagged';
+}
+
+export type CostCategory = 'c1_15' | 'c15_2' | 'c2_3' | 'c3_plus';
+
+export const COST_META: Record<CostCategory, { label: string; color: string }> = {
+  c1_15: { label: '[1, 1.5]', color: '#10b981' },
+  c15_2: { label: '(1.5, 2]', color: '#84cc16' },
+  c2_3: { label: '(2, 3]', color: '#f59e0b' },
+  c3_plus: { label: '(3, ∞)', color: '#ef4444' },
+};
+
+export function classifyCost(costfactor?: number): CostCategory {
+  const c = Math.round(((costfactor ?? 1.0) || 1.0) * 100) / 100;
+  if (c <= 1.5) return 'c1_15';
+  if (c <= 2.0) return 'c15_2';
+  if (c <= 3.0) return 'c2_3';
+  return 'c3_plus';
+}
+
+export function buildCostBreakdown(segments: SegmentData[]): {
+  classifier: (s: SegmentData) => CostCategory;
+  meta: Record<CostCategory, { label: string; color: string }>;
+  subClassifier: (s: SegmentData) => string;
+  subMeta: Record<string, { label: string; parent: CostCategory; color: string }>;
+} {
+  const costs = new Set<number>();
+  for (const s of segments) {
+    const len = Math.max(0, s.to - s.from);
+    if (len <= 0) continue;
+    const c = Math.round(((s.costfactor ?? 1.0) || 1.0) * 100) / 100;
+    costs.add(c);
+  }
+  if (costs.size === 0) costs.add(1.0);
+
+  const sorted = Array.from(costs).sort((a, b) => a - b);
+  const subMeta: Record<string, { label: string; parent: CostCategory; color: string }> = {};
+  for (const c of sorted) {
+    const key = c.toFixed(2);
+    const parent = classifyCost(c);
+    subMeta[key] = {
+      label: `${c.toFixed(2)}×`,
+      parent,
+      color: COST_META[parent].color,
+    };
+  }
+
+  return {
+    classifier: (s) => classifyCost(s.costfactor),
+    meta: COST_META,
+    subClassifier: (s) => {
+      const c = Math.round(((s.costfactor ?? 1.0) || 1.0) * 100) / 100;
+      return c.toFixed(2);
+    },
+    subMeta,
+  };
 }

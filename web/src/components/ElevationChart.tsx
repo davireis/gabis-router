@@ -6,10 +6,12 @@ import {
   classifyRoad,
   classifyTraffic,
   classifyNoise,
+  classifySpeedLimit,
   SURFACE_SUB_META,
   ROAD_META,
   TRAFFIC_META,
   NOISE_META,
+  SPEED_LIMIT_META,
 } from '../utils/classification.ts';
 import { gradeAt, gradeColor, nearestIndex, nearestVertex } from '../utils/geo.ts';
 
@@ -42,6 +44,8 @@ interface HoverDetails {
   trafficLabel: string;
   trafficColor: string;
   noiseLabel: string;
+  speedLabel: string;
+  costLabel: string;
 }
 
 export const ElevationChart: React.FC<ElevationChartProps> = ({
@@ -108,6 +112,8 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
           trafficLabel: '',
           trafficColor: '#94a3b8',
           noiseLabel: '',
+          speedLabel: '',
+          costLabel: '',
         };
       }
       let target = segments[segments.length - 1];
@@ -121,6 +127,15 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
       const rCat = classifyRoad(target.highway);
       const tCat = classifyTraffic(target.traffic, target.highway);
       const nCat = classifyNoise(target.noise);
+      const spCat = classifySpeedLimit(target.maxspeed, target.highway);
+      const speedLabel =
+        spCat !== 'car_free' && spCat !== 'untagged'
+          ? `Limit: ${SPEED_LIMIT_META[spCat].label} mph`
+          : '';
+      const costLabel =
+        typeof target.costfactor === 'number' && target.costfactor > 0
+          ? `Cost: ${target.costfactor.toFixed(2)}×`
+          : '';
       return {
         surfLabel: SURFACE_SUB_META[sCat].label,
         surfColor: SURFACE_SUB_META[sCat].color,
@@ -129,6 +144,8 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
         trafficLabel: `Traffic: ${TRAFFIC_META[tCat].label}`,
         trafficColor: TRAFFIC_META[tCat].color,
         noiseLabel: `Noise: ${NOISE_META[nCat].label}`,
+        speedLabel,
+        costLabel,
       };
     },
     [segments],
@@ -287,6 +304,12 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
                   {hoverState.trafficLabel}
                 </span>
                 <span className="ec-tag">{hoverState.noiseLabel}</span>
+                {hoverState.speedLabel && (
+                  <span className="ec-tag">{hoverState.speedLabel}</span>
+                )}
+                {hoverState.costLabel && (
+                  <span className="ec-tag">{hoverState.costLabel}</span>
+                )}
               </span>
             )}
           </div>

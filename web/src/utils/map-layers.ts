@@ -96,6 +96,20 @@ export function syncRoutesLayers(map: maplibregl.Map, slots: RouteSlotState[]) {
     const source = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
     if (source) {
       source.setData(data);
+      if (map.getLayer(haloId)) {
+        map.setPaintProperty(haloId, 'line-width', [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          6,
+          4.0,
+          12,
+          4.8,
+          16,
+          5.6,
+        ]);
+        map.setPaintProperty(haloId, 'line-opacity', 0.45);
+      }
       if (map.getLayer(casingId)) map.setPaintProperty(casingId, 'line-color', color.casing);
       if (map.getLayer(lineId)) map.setPaintProperty(lineId, 'line-color', color.line);
     } else {
@@ -107,8 +121,8 @@ export function syncRoutesLayers(map: maplibregl.Map, slots: RouteSlotState[]) {
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': '#f8f4f0',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 4.5, 12, 5.5, 16, 7.0],
-          'line-opacity': 0.9,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 4.0, 12, 4.8, 16, 5.6],
+          'line-opacity': 0.45,
         },
       });
       map.addLayer({

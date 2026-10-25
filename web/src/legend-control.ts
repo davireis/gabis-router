@@ -126,32 +126,32 @@ export class LegendControl implements maplibregl.IControl {
         <div class="map-legend-row">
           <span class="map-legend-swatch">
             <svg width="34" height="12" viewBox="0 0 34 12">
-              <line x1="2" y1="6" x2="32" y2="6" stroke="#fb7185" stroke-width="6" stroke-linecap="round" />
+              <line x1="2" y1="6" x2="32" y2="6" stroke="#ef4423" stroke-width="6" stroke-linecap="round" />
               <line x1="2" y1="6" x2="32" y2="6" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" />
             </svg>
           </span>
           <span class="map-legend-label">National (NCN)</span>
-          <span class="map-legend-badge" style="background:#e11d48">1</span>
+          <span class="map-legend-badge" style="background:#a81c0c">1</span>
         </div>
         <div class="map-legend-row">
           <span class="map-legend-swatch">
             <svg width="34" height="12" viewBox="0 0 34 12">
-              <line x1="2" y1="6" x2="32" y2="6" stroke="#c084fc" stroke-width="6" stroke-linecap="round" />
+              <line x1="2" y1="6" x2="32" y2="6" stroke="#9333ea" stroke-width="6" stroke-linecap="round" />
               <line x1="2" y1="6" x2="32" y2="6" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" />
             </svg>
           </span>
           <span class="map-legend-label">Regional (RCN)</span>
-          <span class="map-legend-badge" style="background:#9333ea">42</span>
+          <span class="map-legend-badge" style="background:#4c1d95">42</span>
         </div>
         <div class="map-legend-row">
           <span class="map-legend-swatch">
             <svg width="34" height="12" viewBox="0 0 34 12">
-              <line x1="2" y1="6" x2="32" y2="6" stroke="#14b8a6" stroke-width="6" stroke-linecap="round" />
+              <line x1="2" y1="6" x2="32" y2="6" stroke="#d8b4fe" stroke-width="6" stroke-linecap="round" />
               <line x1="2" y1="6" x2="32" y2="6" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" />
             </svg>
           </span>
           <span class="map-legend-label">Local (LCN)</span>
-          <span class="map-legend-badge" style="background:#0d9488">L3</span>
+          <span class="map-legend-badge" style="background:#7e22ce">L3</span>
         </div>
         <div class="map-legend-row">
           <span class="map-legend-swatch">
@@ -161,17 +161,17 @@ export class LegendControl implements maplibregl.IControl {
             </svg>
           </span>
           <span class="map-legend-label">MTB Route</span>
-          <span class="map-legend-badge" style="background:#ca8a04">M</span>
+          <span class="map-legend-badge" style="background:#854d0e">M</span>
         </div>
         <div class="map-legend-row">
           <span class="map-legend-swatch">
             <svg width="34" height="12" viewBox="0 0 34 12">
-              <line x1="2" y1="6" x2="32" y2="6" stroke="#22c55e" stroke-width="6" stroke-linecap="round" />
-              <line x1="2" y1="6" x2="32" y2="6" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" />
+              <line x1="2" y1="6" x2="32" y2="6" stroke="#9333ea" stroke-opacity="0.3" stroke-width="6" />
+              <line x1="2" y1="6" x2="32" y2="6" stroke="#9333ea" stroke-width="2" stroke-dasharray="4 3" />
             </svg>
           </span>
           <span class="map-legend-label">Proposed Route</span>
-          <span class="map-legend-badge" style="background:#15803d">P</span>
+          <span class="map-legend-badge" style="background:#334155">P</span>
         </div>
       </div>
       <div class="map-legend-section">
