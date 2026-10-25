@@ -430,6 +430,16 @@ export const MapView: React.FC<MapViewProps> = ({
       );
     };
 
+    const openOpenStreetMap = (p: LatLon) => {
+      const lat = p.lat.toFixed(6);
+      const lon = p.lon.toFixed(6);
+      window.open(
+        `https://www.openstreetmap.org/query?lat=${lat}&lon=${lon}#map=18/${lat}/${lon}`,
+        '_blank',
+        'noopener,noreferrer',
+      );
+    };
+
     const inspectFeaturesAt = (screenPoint?: { x: number; y: number }) => {
       if (!screenPoint) return {};
       try {
@@ -497,6 +507,10 @@ export const MapView: React.FC<MapViewProps> = ({
           onSelect: () => openStreetView(p),
         },
         {
+          label: 'See on OpenStreetMap',
+          onSelect: () => openOpenStreetMap(p),
+        },
+        {
           label: 'Copy coordinates',
           onSelect: () => copyCoords(p),
         },
@@ -552,6 +566,10 @@ export const MapView: React.FC<MapViewProps> = ({
           label: 'See on Google Street View',
           dividerBefore: true,
           onSelect: () => openStreetView(area),
+        },
+        {
+          label: 'See on OpenStreetMap',
+          onSelect: () => openOpenStreetMap(area),
         },
         {
           label: 'Copy coordinates',
@@ -956,6 +974,20 @@ export const MapView: React.FC<MapViewProps> = ({
                 if (!wp) return;
                 window.open(
                   `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${wp.lat.toFixed(6)},${wp.lon.toFixed(6)}`,
+                  '_blank',
+                  'noopener,noreferrer',
+                );
+              },
+            },
+            {
+              label: 'See on OpenStreetMap',
+              onSelect: () => {
+                const wp = waypointsRef.current[index];
+                if (!wp) return;
+                const lat = wp.lat.toFixed(6);
+                const lon = wp.lon.toFixed(6);
+                window.open(
+                  `https://www.openstreetmap.org/query?lat=${lat}&lon=${lon}#map=18/${lat}/${lon}`,
                   '_blank',
                   'noopener,noreferrer',
                 );
