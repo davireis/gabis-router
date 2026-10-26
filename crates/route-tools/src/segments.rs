@@ -18,6 +18,9 @@ pub struct PointWayInfo {
     pub noise_class: u8,
     pub traffic_class: u8,
     pub maxspeed: u32,
+    pub town_class: u8,
+    pub lit: bool,
+    pub sidewalk: bool,
 }
 
 /// Finds the road or path edge closest to `(lon_deg, lat_deg)` within `max_distance_m`
@@ -175,7 +178,8 @@ pub fn inspect_nearest_way(
     let mut way_buf = vec![0i32; lookups.way.names.len()];
     lookups.way.decode_into(&mut way_buf, is_reverse, desc_bytes);
     let way_kv = lookups.way.format_key_values(&way_buf);
-    let (surface, highway, noise_class, traffic_class, maxspeed) = parse_way_tags(&way_kv);
+    let (surface, highway, noise_class, traffic_class, maxspeed, town_class, lit, sidewalk) =
+        parse_way_tags(&way_kv);
 
     Some(PointWayInfo {
         distance_m: (mwp.radius * 10.0).round() / 10.0,
@@ -184,6 +188,9 @@ pub fn inspect_nearest_way(
         noise_class,
         traffic_class,
         maxspeed,
+        town_class,
+        lit,
+        sidewalk,
     })
 }
 
@@ -198,11 +205,14 @@ pub struct RouteSegment {
     pub traffic_class: u8,
     pub maxspeed: u32,
     pub costfactor: f32,
+    pub town_class: u8,
+    pub lit: bool,
+    pub sidewalk: bool,
 }
 
-fn parse_way_tags(way_kv: &str) -> (String, String, u8, u8, u32) {
+fn parse_way_tags(way_kv: &str) -> (String, String, u8, u8, u32, u8, bool, bool) {
     if way_kv == "directsegment" {
-        return (String::new(), "beeline".to_string(), 0, 0, 0);
+        return (String::new(), "beeline".to_string(), 0, 0, 0, 0, false, false);
     }
 
     let mut is_reverse = false;
@@ -210,6 +220,9 @@ fn parse_way_tags(way_kv: &str) -> (String, String, u8, u8, u32) {
     let mut highway = String::new();
     let mut noise: u8 = 0;
     let mut traffic: u8 = 0;
+    let mut town: u8 = 0;
+    let mut lit = false;
+    let mut sidewalk = false;
     let mut maxspeed_fwd: Option<&str> = None;
     let mut maxspeed_bwd: Option<&str> = None;
     let mut maxspeed_base: Option<&str> = None;
@@ -225,6 +238,23 @@ fn parse_way_tags(way_kv: &str) -> (String, String, u8, u8, u32) {
             "highway" => highway = v.to_string(),
             "estimated_noise_class" => noise = v.parse::<u8>().unwrap_or(0),
             "estimated_traffic_class" => traffic = v.parse::<u8>().unwrap_or(0),
+            "estimated_town_class" => town = v.parse::<u8>().unwrap_or(0),
+            "lit" => {
+                lit = matches!(
+                    v,
+                    "yes" | "24/7" | "automatic" | "sunset-sunrise" | "dusk-dawn" | "limited"
+                )
+            }
+            "sidewalk" => {
+                if matches!(v, "both" | "right" | "left" | "separate" | "yes") {
+                    sidewalk = true;
+                }
+            }
+            "sidewalk:left" | "sidewalk:right" | "sidewalk:both" => {
+                if matches!(v, "yes" | "separate" | "designated") {
+                    sidewalk = true;
+                }
+            }
             "maxspeed:forward" => maxspeed_fwd = Some(v),
             "maxspeed:backward" => maxspeed_bwd = Some(v),
             "maxspeed" => maxspeed_base = Some(v),
@@ -255,7 +285,7 @@ fn parse_way_tags(way_kv: &str) -> (String, String, u8, u8, u32) {
         traffic = 7;
     }
 
-    (surface, highway, noise, traffic, maxspeed)
+    (surface, highway, noise, traffic, maxspeed, town, lit, sidewalk)
 }
 
 /// Extracts merged `RouteSegment` intervals across `route` from its point distances and way messages.
@@ -276,7 +306,8 @@ pub fn extract_route_segments(route: &RouteResult) -> Vec<RouteSegment> {
         let costfactor = msg
             .map(|m| (m.costfactor * 100.0).round() / 100.0)
             .unwrap_or(1.0);
-        let (surface, highway, noise_class, traffic_class, maxspeed) = parse_way_tags(way_kv);
+        let (surface, highway, noise_class, traffic_class, maxspeed, town_class, lit, sidewalk) =
+            parse_way_tags(way_kv);
 
         if let Some(last) = segments.last_mut() {
             if last.surface == surface
@@ -284,6 +315,9 @@ pub fn extract_route_segments(route: &RouteResult) -> Vec<RouteSegment> {
                 && last.noise_class == noise_class
                 && last.traffic_class == traffic_class
                 && last.maxspeed == maxspeed
+                && last.town_class == town_class
+                && last.lit == lit
+                && last.sidewalk == sidewalk
                 && (last.costfactor - costfactor).abs() < 0.005
             {
                 last.to_dist_m = to_dist;
@@ -299,6 +333,9 @@ pub fn extract_route_segments(route: &RouteResult) -> Vec<RouteSegment> {
             traffic_class,
             maxspeed,
             costfactor,
+            town_class,
+            lit,
+            sidewalk,
         });
     }
 
@@ -317,7 +354,7 @@ pub fn to_geojson_with_segments(route: &RouteResult, profile_name: &str) -> Stri
             seg_json.push_str(",\n          ");
         }
         seg_json.push_str(&format!(
-            r#"{{"from": {:.1}, "to": {:.1}, "surface": "{}", "highway": "{}", "noise": {}, "traffic": {}, "maxspeed": {}, "costfactor": {:.2}}}"#,
+            r#"{{"from": {:.1}, "to": {:.1}, "surface": "{}", "highway": "{}", "noise": {}, "traffic": {}, "maxspeed": {}, "costfactor": {:.2}, "town": {}, "lit": {}, "sidewalk": {}}}"#,
             seg.from_dist_m,
             seg.to_dist_m,
             seg.surface,
@@ -325,7 +362,10 @@ pub fn to_geojson_with_segments(route: &RouteResult, profile_name: &str) -> Stri
             seg.noise_class,
             seg.traffic_class,
             seg.maxspeed,
-            seg.costfactor
+            seg.costfactor,
+            seg.town_class,
+            seg.lit,
+            seg.sidewalk
         ));
     }
 

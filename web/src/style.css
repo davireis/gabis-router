@@ -66,7 +66,7 @@ body,
   position: absolute;
   top: calc(16px + env(safe-area-inset-top));
   left: calc(16px + env(safe-area-inset-left));
-  bottom: calc(16px + env(safe-area-inset-bottom));
+  bottom: auto;
   z-index: 15;
   background: var(--panel);
   backdrop-filter: blur(16px);
@@ -99,7 +99,7 @@ body,
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  max-height: calc(100vh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   overflow: hidden;
 }
 
@@ -498,6 +498,110 @@ body,
   color: #ffffff;
 }
 
+.route-tabs-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.route-tabs-list {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.route-tab {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--field);
+  color: var(--muted);
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  overflow: hidden;
+}
+
+.route-tab:hover {
+  border-color: var(--text-2);
+  color: var(--text);
+}
+
+.route-tab.active {
+  background: var(--accent-soft);
+  border-color: var(--route-tab-color, var(--accent));
+  color: var(--text);
+}
+
+.route-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.route-tab.active .route-tab-btn {
+  font-weight: 700;
+}
+
+.route-tab-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.route-tab-dot.is-routing {
+  animation: slotDotPulse 1s ease-in-out infinite;
+}
+
+.route-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 5px 4px 2px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.route-tab-close:hover {
+  color: var(--danger, #dc2626);
+}
+
+.route-tabs-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.btn-add-route {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: rgba(37, 99, 235, 0.28);
+}
+
+.btn-add-route:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
 .profile-slots-list {
   display: flex;
   flex-direction: column;
@@ -808,6 +912,8 @@ body,
   display: flex;
   align-items: center;
   gap: 5px;
+  flex: 0 1 auto;
+  min-height: 0;
 }
 
 .waypoints-reverse-btn {
@@ -865,16 +971,26 @@ body,
   min-height: 0;
 }
 
+.waypoints-container.is-scrollable {
+  overflow: hidden;
+}
+
 #waypoint-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 280px;
-  overflow-y: visible;
   position: relative;
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   min-width: 0;
-  padding: 0;
+  max-height: 100%;
+  padding: 2px 2px 2px 0;
+}
+
+#waypoint-list.is-scrollable {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
 }
 
 .wp-row {
@@ -2023,6 +2139,10 @@ body,
   flex-shrink: 0;
 }
 
+.route-bar-card.is-active {
+  border-color: var(--slot-color, var(--accent));
+}
+
 .ri-bar-header {
   display: flex;
   align-items: center;
@@ -2229,6 +2349,44 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+.ri-col-header-breakdown {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.breakdown-bar-selector {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.breakdown-selector-chip {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.6rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.breakdown-selector-chip:hover {
+  color: var(--text);
+  border-color: var(--text-2);
+}
+
+.breakdown-selector-chip.active {
+  background: var(--primary-soft, rgba(37, 99, 235, 0.12));
+  color: var(--primary);
+  border-color: rgba(37, 99, 235, 0.35);
 }
 
 /* Elevation Chart & Structured Readout Strip */

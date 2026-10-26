@@ -6,10 +6,13 @@
 //! candidate snapping, routes along the matched path, and trims retraced via-point
 //! spikes via `RouteResult::merge_with_via_correction`.
 
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+
 use brouter_rs::dsl::evaluator::ProfileEvaluator;
 use brouter_rs::dsl::lookups::LookupData;
 use brouter_rs::dsl::parser::Profile;
-use brouter_rs::graph::routing_graph::RoutingGraph;
+use brouter_rs::graph::routing_graph::{CellProvider, MICRO_CACHE_CELL_SIZE, RoutingGraph};
 use brouter_rs::graph::spatial::{
     self, distance, get_difference_from_direction, get_direction, lat_to_ilat, lon_to_ilon,
 };
@@ -804,20 +807,8 @@ fn route_control_span_adaptive(
                 .map(|p| Point2D::new(lon_to_ilon(p.lon), lat_to_ilat(p.lat)))
                 .collect();
             let gps_slice = &dedup_2d[start_cand.dedup_idx..=end_cand.dedup_idx];
-            for &pt in gps_slice {
-                if min_dist_to_polyline_m(pt, &leg_2d) > tol {
-                    needs_split = true;
-                    break;
-                }
-            }
-            if !needs_split {
-                for &lp in &leg_2d {
-                    if min_dist_to_polyline_m(lp, gps_slice) > tol {
-                        needs_split = true;
-                        break;
-                    }
-                }
-            }
+            needs_split = exceeds_polyline_tolerance_m(gps_slice, &leg_2d, tol)
+                || exceeds_polyline_tolerance_m(&leg_2d, gps_slice, tol);
         }
 
         if needs_split {
@@ -876,20 +867,94 @@ fn route_control_span_adaptive(
     false
 }
 
-fn match_track_points_ref(
+/// Preloads all `MicroCache` cells in a `±25_000` microdegree (`±2` cell) corridor along `dedup_2d`,
+/// resolves the corridor graph once, and temporarily detaches `cell_provider` so repeated `route_leg_ref`
+/// calls during map-matching and waypoint minimization reuse the resolved graph and cached profile costs
+/// without resetting topology or reloading cells on every leg.
+struct CorridorProviderGuard<'a, 'g> {
+    graph: &'a mut GraphRef<'g>,
+    saved_provider: Option<Arc<dyn CellProvider>>,
+}
+
+impl<'a, 'g> CorridorProviderGuard<'a, 'g> {
+    fn new(graph: &'a mut GraphRef<'g>, dedup_2d: &[Point2D]) -> Self {
+        let mut saved_provider = None;
+        if let Some(g_mut) = graph.as_mut() {
+            if g_mut.has_cell_provider() {
+                g_mut.reset_for_pass([0; 4]);
+                g_mut.track_spatial_grid = true;
+                let mut seen_cells: HashSet<(i32, i32)> =
+                    HashSet::with_capacity(dedup_2d.len() * 4);
+                for &pt in dedup_2d {
+                    let base_cx = pt.lon.div_euclid(MICRO_CACHE_CELL_SIZE);
+                    let base_cy = pt.lat.div_euclid(MICRO_CACHE_CELL_SIZE);
+                    for dcx in -2..=2 {
+                        for dcy in -2..=2 {
+                            let cx = base_cx + dcx;
+                            let cy = base_cy + dcy;
+                            if seen_cells.insert((cx, cy)) {
+                                g_mut.ensure_cell_at_microdeg(
+                                    cx * MICRO_CACHE_CELL_SIZE + (MICRO_CACHE_CELL_SIZE / 2),
+                                    cy * MICRO_CACHE_CELL_SIZE + (MICRO_CACHE_CELL_SIZE / 2),
+                                );
+                            }
+                        }
+                    }
+                }
+                g_mut.track_spatial_grid = false;
+
+                // Ensure external links whose geometry lives in a neighbor cell have that cell loaded
+                let mut target_coords: Vec<(i32, i32)> = Vec::new();
+                for edges in g_mut.edges.values() {
+                    for e in edges {
+                        if e.is_reverse && e.is_geometry_empty() {
+                            target_coords.push((e.target_lon, e.target_lat));
+                        }
+                    }
+                }
+                const CELL_GCD: i32 = 6_250;
+                let mut last_cell = (i32::MIN, i32::MIN);
+                for (t_ilon, t_ilat) in target_coords {
+                    let cell = (t_ilon.div_euclid(CELL_GCD), t_ilat.div_euclid(CELL_GCD));
+                    if cell != last_cell {
+                        last_cell = cell;
+                        g_mut.ensure_cell_at_microdeg(t_ilon, t_ilat);
+                    }
+                }
+
+                g_mut.resolve_edge_target_elevations();
+                saved_provider = g_mut.cell_provider.0.take();
+            }
+        }
+        Self {
+            graph,
+            saved_provider,
+        }
+    }
+}
+
+impl Drop for CorridorProviderGuard<'_, '_> {
+    fn drop(&mut self) {
+        if let Some(provider) = self.saved_provider.take() {
+            if let Some(g_mut) = self.graph.as_mut() {
+                g_mut.cell_provider.0 = Some(provider);
+                g_mut.reset_for_pass([0; 4]);
+            }
+        }
+    }
+}
+
+fn match_track_points_with_dedup_ref(
     router: &AStarRouter,
     graph: &mut GraphRef<'_>,
     lookups: &LookupData,
     profile: &Profile,
-    track_points: &[(f64, f64)],
+    dedup: &[(f64, f64)],
+    dedup_2d: &[Point2D],
     options: &MapMatchOptions,
 ) -> Result<RouteResult, String> {
-    if track_points.len() < 2 {
-        return Err("At least 2 GPS track points are required for map-matching".to_string());
-    }
-    let (dedup, dedup_2d) = deduplicate_track_points(track_points, options.min_point_spacing_m);
     let control_cands =
-        extract_snapped_candidates_ref(&dedup, &dedup_2d, graph, lookups, profile, options)?;
+        extract_snapped_candidates_ref(dedup, dedup_2d, graph, lookups, profile, options)?;
     let timode = options
         .turn_instruction_mode
         .unwrap_or_else(|| profile.get_global_var("turnInstructionMode", 0.0) as i32);
@@ -906,8 +971,8 @@ fn match_track_points_ref(
                 graph,
                 lookups,
                 profile,
-                &dedup,
-                &dedup_2d,
+                dedup,
+                dedup_2d,
                 &control_cands[curr_idx],
                 &control_cands[next_idx],
                 options,
@@ -937,6 +1002,30 @@ fn match_track_points_ref(
     Ok(merged)
 }
 
+fn match_track_points_ref(
+    router: &AStarRouter,
+    graph: &mut GraphRef<'_>,
+    lookups: &LookupData,
+    profile: &Profile,
+    track_points: &[(f64, f64)],
+    options: &MapMatchOptions,
+) -> Result<RouteResult, String> {
+    if track_points.len() < 2 {
+        return Err("At least 2 GPS track points are required for map-matching".to_string());
+    }
+    let (dedup, dedup_2d) = deduplicate_track_points(track_points, options.min_point_spacing_m);
+    let guard = CorridorProviderGuard::new(graph, &dedup_2d);
+    match_track_points_with_dedup_ref(
+        router,
+        guard.graph,
+        lookups,
+        profile,
+        &dedup,
+        &dedup_2d,
+        options,
+    )
+}
+
 fn match_track_with_minimal_waypoints_ref(
     router: &AStarRouter,
     graph: &mut GraphRef<'_>,
@@ -945,8 +1034,16 @@ fn match_track_with_minimal_waypoints_ref(
     track_points: &[(f64, f64)],
     options: &MapMatchOptions,
 ) -> Result<(Vec<(f64, f64)>, RouteResult), String> {
-    let ref_route =
-        match_track_points_ref(router, graph, lookups, profile, track_points, options)?;
+    if track_points.len() < 2 {
+        return Err("At least 2 GPS track points are required for map-matching".to_string());
+    }
+    let (dedup, dedup_2d) = deduplicate_track_points(track_points, options.min_point_spacing_m);
+    let guard = CorridorProviderGuard::new(graph, &dedup_2d);
+    let graph = &mut *guard.graph;
+
+    let ref_route = match_track_points_with_dedup_ref(
+        router, graph, lookups, profile, &dedup, &dedup_2d, options,
+    )?;
     if ref_route.points.len() < 2 {
         return Err("Map-matched reference route has fewer than 2 points".to_string());
     }
@@ -1016,6 +1113,9 @@ fn match_track_with_minimal_waypoints_ref(
         .rev()
         .map(|w| (w[0], w[1]))
         .collect();
+    let mut failed_spans: HashSet<(usize, usize)> = HashSet::new();
+    let mut ok_legs: HashMap<(usize, usize), RouteResult> = HashMap::new();
+
     while let Some((start_idx, end_idx)) = stack.pop() {
         if end_idx <= start_idx + 1 || cum_dist[end_idx] - cum_dist[start_idx] < tol_m * 2.0 {
             continue;
@@ -1037,12 +1137,16 @@ fn match_track_with_minimal_waypoints_ref(
                     &leg,
                     tol_m,
                 ) {
+                    failed_spans.insert((start_idx, end_idx));
                     keep[split_k] = true;
                     stack.push((split_k, end_idx));
                     stack.push((start_idx, split_k));
+                } else {
+                    ok_legs.insert((start_idx, end_idx), leg);
                 }
             }
             Err(_) => {
+                failed_spans.insert((start_idx, end_idx));
                 let target_d = (cum_dist[start_idx] + cum_dist[end_idx]) * 0.5;
                 if let Some(mid_k) = ((start_idx + 1)..end_idx).min_by(|&a, &b| {
                     (cum_dist[a] - target_d)
@@ -1066,6 +1170,14 @@ fn match_track_with_minimal_waypoints_ref(
     while i + 1 < kept.len() {
         let prev_idx = kept[i - 1];
         let next_idx = kept[i + 1];
+        if failed_spans.contains(&(prev_idx, next_idx)) {
+            i += 1;
+            continue;
+        }
+        if ok_legs.contains_key(&(prev_idx, next_idx)) {
+            kept.remove(i);
+            continue;
+        }
         let bridged = router.route_leg_ref(
             graph,
             lookups,
@@ -1079,11 +1191,21 @@ fn match_track_with_minimal_waypoints_ref(
             timode,
         );
         let can_drop = match bridged {
-            Ok(leg) => find_worst_deviation_index(
-                &ref_2d, &cum_dist, prev_idx, next_idx, &leg, tol_m,
-            )
-            .is_none(),
-            Err(_) => false,
+            Ok(leg) => {
+                if find_worst_deviation_index(&ref_2d, &cum_dist, prev_idx, next_idx, &leg, tol_m)
+                    .is_none()
+                {
+                    ok_legs.insert((prev_idx, next_idx), leg);
+                    true
+                } else {
+                    failed_spans.insert((prev_idx, next_idx));
+                    false
+                }
+            }
+            Err(_) => {
+                failed_spans.insert((prev_idx, next_idx));
+                false
+            }
         };
         if can_drop {
             kept.remove(i);
@@ -1093,32 +1215,168 @@ fn match_track_with_minimal_waypoints_ref(
     }
 
     let waypoints: Vec<(f64, f64)> = kept.iter().map(|&idx| wp_coord(idx)).collect();
-    let final_route = router.route_with_graph_ref(
-        graph,
-        lookups,
-        profile,
-        &waypoints,
-        &brouter_rs::routing::search::RoutingOptions::default(),
-    )?;
+    let mut final_legs = Vec::with_capacity(kept.len().saturating_sub(1));
+    let mut all_cached = true;
+    for pair in kept.windows(2) {
+        let (s_idx, e_idx) = (pair[0], pair[1]);
+        if let Some(leg) = ok_legs.remove(&(s_idx, e_idx)) {
+            final_legs.push(leg);
+        } else if let Ok(leg) = router.route_leg_ref(
+            graph,
+            lookups,
+            profile,
+            wp_coord(s_idx),
+            wp_coord(e_idx),
+            0,
+            &[],
+            None,
+            false,
+            timode,
+        ) {
+            final_legs.push(leg);
+        } else {
+            all_cached = false;
+            break;
+        }
+    }
+
+    let final_route = if all_cached && !final_legs.is_empty() {
+        let kinematic_cfg = KinematicConfig::from_profile(profile);
+        let mut merged = RouteResult::merge(final_legs)?;
+        merged.turn_instruction_mode = timode;
+        merged.recalc_track(graph, &kinematic_cfg);
+        merged
+    } else {
+        router.route_with_graph_ref(
+            graph,
+            lookups,
+            profile,
+            &waypoints,
+            &brouter_rs::routing::search::RoutingOptions::default(),
+        )?
+    };
 
     Ok((waypoints, final_route))
 }
 
-fn min_dist_to_polyline_m(pt: Point2D, poly: &[Point2D]) -> f64 {
+#[inline]
+fn point_to_segment_dist_sq_m(pt: Point2D, a: Point2D, b: Point2D, kx: f64, ky: f64) -> f64 {
+    let dx = (b.lon - a.lon) as f64 * kx;
+    let dy = (b.lat - a.lat) as f64 * ky;
+    let px = (pt.lon - a.lon) as f64 * kx;
+    let py = (pt.lat - a.lat) as f64 * ky;
+    let len_sq = dx * dx + dy * dy;
+    if len_sq <= 1e-6 {
+        return px * px + py * py;
+    }
+    let t = ((px * dx + py * dy) / len_sq).clamp(0.0, 1.0);
+    let rx = px - t * dx;
+    let ry = py - t * dy;
+    rx * rx + ry * ry
+}
+
+fn min_dist_to_polyline_with_hint_m(
+    pt: Point2D,
+    poly: &[Point2D],
+    kx: f64,
+    ky: f64,
+    inv_kx: f64,
+    inv_ky: f64,
+    hint_seg: &mut usize,
+    early_tol_sq: f64,
+) -> f64 {
     if poly.is_empty() {
         return f64::INFINITY;
     }
     if poly.len() == 1 {
         return distance(pt, poly[0]);
     }
-    let mut best = f64::INFINITY;
-    for seg in poly.windows(2) {
-        let d = perpendicular_distance_m(pt, seg[0], seg[1]);
-        if d < best {
-            best = d;
+    let n_segs = poly.len() - 1;
+    let h = (*hint_seg).min(n_segs - 1);
+
+    let mut best_sq = f64::INFINITY;
+    let mut best_idx = h;
+
+    // Check local window around hint_seg first for sequential points along a matched route
+    let win_start = h.saturating_sub(2);
+    let win_end = (h + 6).min(n_segs);
+    for (idx, seg) in poly
+        .windows(2)
+        .enumerate()
+        .take(win_end)
+        .skip(win_start)
+    {
+        let d_sq = point_to_segment_dist_sq_m(pt, seg[0], seg[1], kx, ky);
+        if d_sq < best_sq {
+            best_sq = d_sq;
+            best_idx = idx;
+            if best_sq <= early_tol_sq {
+                *hint_seg = best_idx;
+                return best_sq.sqrt();
+            }
         }
     }
-    best
+
+    let mut bound_m = best_sq.sqrt();
+    let mut max_dlon = (bound_m * inv_kx) as i32 + 20;
+    let mut max_dlat = (bound_m * inv_ky) as i32 + 20;
+
+    for (idx, seg) in poly.windows(2).enumerate() {
+        if idx >= win_start && idx < win_end {
+            continue;
+        }
+        let a = seg[0];
+        let b = seg[1];
+        if pt.lon < a.lon.min(b.lon) - max_dlon
+            || pt.lon > a.lon.max(b.lon) + max_dlon
+            || pt.lat < a.lat.min(b.lat) - max_dlat
+            || pt.lat > a.lat.max(b.lat) + max_dlat
+        {
+            continue;
+        }
+        let d_sq = point_to_segment_dist_sq_m(pt, a, b, kx, ky);
+        if d_sq < best_sq {
+            best_sq = d_sq;
+            best_idx = idx;
+            if best_sq <= early_tol_sq {
+                *hint_seg = best_idx;
+                return best_sq.sqrt();
+            }
+            bound_m = best_sq.sqrt();
+            max_dlon = (bound_m * inv_kx) as i32 + 20;
+            max_dlat = (bound_m * inv_ky) as i32 + 20;
+        }
+    }
+
+    *hint_seg = best_idx;
+    best_sq.sqrt()
+}
+
+fn exceeds_polyline_tolerance_m(pts: &[Point2D], poly: &[Point2D], tol_m: f64) -> bool {
+    if pts.is_empty() || poly.is_empty() {
+        return false;
+    }
+    let [kx, ky] = spatial::get_lon_lat_to_meter_scales(poly[poly.len() / 2].lat);
+    let inv_kx = 1.0 / kx.max(1e-6);
+    let inv_ky = 1.0 / ky.max(1e-6);
+    let tol_sq = tol_m * tol_m;
+    let mut hint_seg = 0usize;
+    for &pt in pts {
+        if min_dist_to_polyline_with_hint_m(
+            pt,
+            poly,
+            kx,
+            ky,
+            inv_kx,
+            inv_ky,
+            &mut hint_seg,
+            tol_sq,
+        ) > tol_m
+        {
+            return true;
+        }
+    }
+    false
 }
 
 /// Returns an interior reference index `k` in `(start_idx + 1)..end_idx` to split at when
@@ -1143,6 +1401,11 @@ fn find_worst_deviation_index(
         return None;
     }
 
+    let [kx, ky] = spatial::get_lon_lat_to_meter_scales(ref_2d[(start_idx + end_idx) / 2].lat);
+    let inv_kx = 1.0 / kx.max(1e-6);
+    let inv_ky = 1.0 / ky.max(1e-6);
+    let tol_sq = tol_m * tol_m;
+
     struct Excursion {
         start_k: usize,
         end_k: usize,
@@ -1152,12 +1415,22 @@ fn find_worst_deviation_index(
 
     let mut excursions: Vec<Excursion> = Vec::new();
     let mut cur_exc: Option<Excursion> = None;
+    let mut hint_seg = 0usize;
 
     for k in (start_idx + 1)..end_idx {
         if cum_dist[k] - cum_dist[start_idx] < tol_m || cum_dist[end_idx] - cum_dist[k] < tol_m {
             continue;
         }
-        let d = min_dist_to_polyline_m(ref_2d[k], &leg_2d);
+        let d = min_dist_to_polyline_with_hint_m(
+            ref_2d[k],
+            &leg_2d,
+            kx,
+            ky,
+            inv_kx,
+            inv_ky,
+            &mut hint_seg,
+            tol_sq,
+        );
         if d > tol_m {
             match &mut cur_exc {
                 Some(exc) => {
@@ -1236,8 +1509,18 @@ fn find_worst_deviation_index(
     let ref_slice = &ref_2d[start_idx..=end_idx];
     let mut max_leg_dev = 0.0f64;
     let mut worst_lp = None;
+    let mut ref_hint_seg = 0usize;
     for &lp in &leg_2d {
-        let d = min_dist_to_polyline_m(lp, ref_slice);
+        let d = min_dist_to_polyline_with_hint_m(
+            lp,
+            ref_slice,
+            kx,
+            ky,
+            inv_kx,
+            inv_ky,
+            &mut ref_hint_seg,
+            tol_sq,
+        );
         if d > max_leg_dev {
             max_leg_dev = d;
             worst_lp = Some(lp);

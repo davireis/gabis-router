@@ -157,6 +157,8 @@ export const App: React.FC = () => {
 
       <RouteInfoDrawer
         slots={routing.slots}
+        activeSlotIdx={routing.activeSlotIdx}
+        onSelectActiveSlot={routing.setActiveSlot}
         getProfileMeta={routing.getProfileMeta}
         statusMessage={routing.status}
         units={settings.units}
@@ -181,6 +183,8 @@ export const App: React.FC = () => {
         waypoints={routing.waypoints}
         avoidAreas={routing.avoidAreas}
         slots={routing.slots}
+        activeSlotIdx={routing.activeSlotIdx}
+        onSelectActiveSlot={routing.setActiveSlot}
         segmentHighlight={segmentHighlight}
         hoverPosition={hoverPosition}
         isOfflineMode={offline.isOfflineMode}

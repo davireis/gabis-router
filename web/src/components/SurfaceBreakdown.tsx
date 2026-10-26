@@ -7,6 +7,8 @@ import {
   classifySurfaceSubclass,
   classifyRoadGroup,
   classifyRoad,
+  classifyArea,
+  classifyAreaSubclass,
   classifyTraffic,
   classifyTrafficSubclass,
   classifyNoise,
@@ -17,6 +19,8 @@ import {
   SURFACE_SUB_META,
   ROAD_GROUP_META,
   ROAD_META,
+  AREA_META,
+  AREA_SUB_META,
   TRAFFIC_META,
   TRAFFIC_SUB_META,
   NOISE_META,
@@ -26,11 +30,32 @@ import {
 import { formatDistance, type Units } from '../format.ts';
 import { InfoButton } from './TooltipPopover.tsx';
 
+export type BreakdownBarId = 'surface' | 'road' | 'area' | 'traffic' | 'noise' | 'speed' | 'cost';
+
+export const BREAKDOWN_BAR_OPTIONS: Array<{ id: BreakdownBarId; label: string; title: string }> = [
+  { id: 'surface', label: 'Surface', title: 'Toggle Surface breakdown bar' },
+  { id: 'road', label: 'Road', title: 'Toggle Road Type breakdown bar' },
+  { id: 'area', label: 'Area', title: 'Toggle Urban / Countryside breakdown bar' },
+  { id: 'traffic', label: 'Traffic', title: 'Toggle Traffic breakdown bar' },
+  { id: 'noise', label: 'Noise', title: 'Toggle Noise breakdown bar' },
+  { id: 'speed', label: 'Limit', title: 'Toggle Speed Limit breakdown bar' },
+  { id: 'cost', label: 'Cost', title: 'Toggle Cost Factor breakdown bar' },
+];
+
+export const DEFAULT_BREAKDOWN_BARS: BreakdownBarId[] = [
+  'surface',
+  'road',
+  'area',
+  'traffic',
+  'cost',
+];
+
 interface SurfaceBreakdownProps {
   slotIdx?: number;
   profile: Profile | null;
   segments: SegmentData[];
   units: Units;
+  visibleBars?: BreakdownBarId[];
   onHover: (pos: { lon: number; lat: number } | null) => void;
   onHighlightSegment: (highlight: SegmentHighlight | null) => void;
 }
@@ -334,6 +359,7 @@ export const SurfaceBreakdown: React.FC<SurfaceBreakdownProps> = ({
   profile,
   segments,
   units: _units,
+  visibleBars = DEFAULT_BREAKDOWN_BARS,
   onHover,
   onHighlightSegment,
 }) => {
@@ -369,6 +395,7 @@ export const SurfaceBreakdown: React.FC<SurfaceBreakdownProps> = ({
   );
 
   const costBreakdown = useMemo(() => buildCostBreakdown(segments), [segments]);
+  const visibleSet = useMemo(() => new Set<BreakdownBarId>(visibleBars), [visibleBars]);
 
   if (!profile || segments.length === 0) return null;
   const total = profile.dist[profile.dist.length - 1] || 1;
@@ -376,106 +403,137 @@ export const SurfaceBreakdown: React.FC<SurfaceBreakdownProps> = ({
 
   return (
     <div id={domId} className="surface-section">
-      <StackedBarRow
-        rowKey="surface"
-        title="Surface"
-        tooltip="OpenStreetMap surface=* classes: Paved (asphalt, paved, concrete), Cobbles (paving_stones, sett, cobblestone), Unpaved (compacted, gravel, dirt, grass, mud, wood), and Untagged. Click any class chip to expand its subclasses."
-        ariaLabel="Surface types"
-        totalDist={total}
-        segments={segments}
-        classifier={(s) => classifySurface(s.surface, s.highway)}
-        meta={SURFACE_META}
-        subClassifier={(s) => classifySurfaceSubclass(s.surface, s.highway)}
-        subMeta={SURFACE_SUB_META}
-        profile={profile}
-        pinnedKey={pinned?.key ?? null}
-        onTogglePin={handleTogglePin}
-        onHover={onHover}
-        onHighlightSegment={handleHighlight}
-      />
-      <StackedBarRow
-        rowKey="road"
-        title="Road Type"
-        tooltip="OpenStreetMap highway=* classes: Paths (cycleway, footway, path, bridleway, pedestrian), Tracks (highway=track), Minor (residential, service, unclassified), Main (tertiary, secondary), and Arterial (primary, trunk). Click any class chip to expand its subclasses."
-        ariaLabel="Road types"
-        totalDist={total}
-        segments={segments}
-        classifier={(s) => classifyRoadGroup(s.highway)}
-        meta={ROAD_GROUP_META}
-        subClassifier={(s) => classifyRoad(s.highway)}
-        subMeta={ROAD_META}
-        profile={profile}
-        pinnedKey={pinned?.key ?? null}
-        onTogglePin={handleTogglePin}
-        onHover={onHover}
-        onHighlightSegment={handleHighlight}
-      />
-      <StackedBarRow
-        rowKey="traffic"
-        title="Traffic"
-        tooltip="Estimated motor vehicle volume from BRouter estimated_traffic_class=0..7: Quiet (classes 0–3, where 0 is unmodelled paths and local roads), Busy (classes 4–5), and Heavy (classes 6–7). Click any class chip to expand its subclasses."
-        ariaLabel="Traffic levels"
-        totalDist={total}
-        segments={segments}
-        classifier={(s) => classifyTraffic(s.traffic, s.highway)}
-        meta={TRAFFIC_META}
-        subClassifier={(s) => classifyTrafficSubclass(s.traffic, s.highway)}
-        subMeta={TRAFFIC_SUB_META}
-        profile={profile}
-        pinnedKey={pinned?.key ?? null}
-        onTogglePin={handleTogglePin}
-        onHover={onHover}
-        onHighlightSegment={handleHighlight}
-      />
-      <StackedBarRow
-        rowKey="noise"
-        title="Noise"
-        tooltip="Modeled noise exposure from BRouter estimated_noise_class=0..6: Quiet (classes 0–2, where 0 is unmodelled outside the 64 m noise buffer of major roads), Moderate (classes 3–4), and Loud (classes 5–6). Click any class chip to expand its subclasses."
-        ariaLabel="Noise levels"
-        totalDist={total}
-        segments={segments}
-        classifier={(s) => classifyNoise(s.noise)}
-        meta={NOISE_META}
-        subClassifier={(s) => classifyNoiseSubclass(s.noise)}
-        subMeta={NOISE_SUB_META}
-        profile={profile}
-        pinnedKey={pinned?.key ?? null}
-        onTogglePin={handleTogglePin}
-        onHover={onHover}
-        onHighlightSegment={handleHighlight}
-      />
-      <StackedBarRow
-        rowKey="speed"
-        title="Limit (mph)"
-        tooltip="Posted motor vehicle speed limits (mph) from OpenStreetMap maxspeed=* tags, plus car-free tracks and cycle paths."
-        ariaLabel="Speed limits in mph"
-        totalDist={total}
-        segments={segments}
-        classifier={(s) => classifySpeedLimit(s.maxspeed, s.highway)}
-        meta={SPEED_LIMIT_META}
-        profile={profile}
-        pinnedKey={pinned?.key ?? null}
-        onTogglePin={handleTogglePin}
-        onHover={onHover}
-        onHighlightSegment={handleHighlight}
-      />
-      <StackedBarRow
-        rowKey="cost"
-        title="Cost (×)"
-        tooltip="BRouter way cost factor multiplier ([1, 1.5], (1.5, 2], (2, 3], (3, ∞)). 1.0× equals an ideal road or path; hover any segment to see its exact multiplier or click a class chip to inspect its exact cost subclasses."
-        ariaLabel="Cost factor breakdown"
-        totalDist={total}
-        segments={segments}
-        classifier={costBreakdown.classifier}
-        meta={costBreakdown.meta}
-        subClassifier={costBreakdown.subClassifier}
-        subMeta={costBreakdown.subMeta}
-        profile={profile}
-        pinnedKey={pinned?.key ?? null}
-        onTogglePin={handleTogglePin}
-        onHover={onHover}
-        onHighlightSegment={handleHighlight}
-      />
+      {visibleSet.has('surface') && (
+        <StackedBarRow
+          rowKey="surface"
+          title="Surface"
+          tooltip="OpenStreetMap surface=* classes: Paved (asphalt, paved, concrete), Cobbles (paving_stones, sett, cobblestone), Unpaved (compacted, gravel, dirt, grass, mud, wood), and Untagged. Click any class chip to expand its subclasses."
+          ariaLabel="Surface types"
+          totalDist={total}
+          segments={segments}
+          classifier={(s) => classifySurface(s.surface, s.highway)}
+          meta={SURFACE_META}
+          subClassifier={(s) => classifySurfaceSubclass(s.surface, s.highway)}
+          subMeta={SURFACE_SUB_META}
+          profile={profile}
+          pinnedKey={pinned?.key ?? null}
+          onTogglePin={handleTogglePin}
+          onHover={onHover}
+          onHighlightSegment={handleHighlight}
+        />
+      )}
+      {visibleSet.has('road') && (
+        <StackedBarRow
+          rowKey="road"
+          title="Road Type"
+          tooltip="UK OpenStreetMap highway=* classes: Paths (cycleway, footway, path, bridleway, pedestrian), Tracks (highway=track), Small Roads (C-roads/tertiary, unclassified, residential, service), B-Roads (secondary), A-Roads (primary non-primary A-roads and trunk primary A-roads), and Motorways (motorway). Click any class chip to expand its subclasses."
+          ariaLabel="Road types"
+          totalDist={total}
+          segments={segments}
+          classifier={(s) => classifyRoadGroup(s.highway)}
+          meta={ROAD_GROUP_META}
+          subClassifier={(s) => classifyRoad(s.highway)}
+          subMeta={ROAD_META}
+          profile={profile}
+          pinnedKey={pinned?.key ?? null}
+          onTogglePin={handleTogglePin}
+          onHover={onHover}
+          onHighlightSegment={handleHighlight}
+        />
+      )}
+      {visibleSet.has('area') && (
+        <StackedBarRow
+          rowKey="area"
+          title="Area"
+          tooltip="Urban vs Countryside from BRouter estimated_town_class=1..6, OpenStreetMap lit=*, sidewalk=*, and residential streets: Countryside (unlit non-residential without sidewalks and town class 0) vs Urban (town class 1–6, lit=yes, sidewalk present, or residential). Click any class chip to expand its subclasses."
+          ariaLabel="Urban and countryside areas"
+          totalDist={total}
+          segments={segments}
+          classifier={(s) => classifyArea(s)}
+          meta={AREA_META}
+          subClassifier={(s) => classifyAreaSubclass(s)}
+          subMeta={AREA_SUB_META}
+          profile={profile}
+          pinnedKey={pinned?.key ?? null}
+          onTogglePin={handleTogglePin}
+          onHover={onHover}
+          onHighlightSegment={handleHighlight}
+        />
+      )}
+      {visibleSet.has('traffic') && (
+        <StackedBarRow
+          rowKey="traffic"
+          title="Traffic"
+          tooltip="Estimated motor vehicle volume from BRouter estimated_traffic_class=0..7: Quiet (classes 0–2, where 0 is unmodelled paths and local roads), Fair (class 3), Busy (classes 4–5), and Heavy (classes 6–7). Click any class chip to expand its subclasses."
+          ariaLabel="Traffic levels"
+          totalDist={total}
+          segments={segments}
+          classifier={(s) => classifyTraffic(s.traffic, s.highway)}
+          meta={TRAFFIC_META}
+          subClassifier={(s) => classifyTrafficSubclass(s.traffic, s.highway)}
+          subMeta={TRAFFIC_SUB_META}
+          profile={profile}
+          pinnedKey={pinned?.key ?? null}
+          onTogglePin={handleTogglePin}
+          onHover={onHover}
+          onHighlightSegment={handleHighlight}
+        />
+      )}
+      {visibleSet.has('noise') && (
+        <StackedBarRow
+          rowKey="noise"
+          title="Noise"
+          tooltip="Modeled noise exposure from BRouter estimated_noise_class=0..6: Quiet (classes 0–2, where 0 is unmodelled outside the 64 m noise buffer of major roads), Moderate (classes 3–4), and Loud (classes 5–6). Click any class chip to expand its subclasses."
+          ariaLabel="Noise levels"
+          totalDist={total}
+          segments={segments}
+          classifier={(s) => classifyNoise(s.noise)}
+          meta={NOISE_META}
+          subClassifier={(s) => classifyNoiseSubclass(s.noise)}
+          subMeta={NOISE_SUB_META}
+          profile={profile}
+          pinnedKey={pinned?.key ?? null}
+          onTogglePin={handleTogglePin}
+          onHover={onHover}
+          onHighlightSegment={handleHighlight}
+        />
+      )}
+      {visibleSet.has('speed') && (
+        <StackedBarRow
+          rowKey="speed"
+          title="Limit (mph)"
+          tooltip="Posted motor vehicle speed limits (mph) from OpenStreetMap maxspeed=* tags, plus car-free tracks and cycle paths."
+          ariaLabel="Speed limits in mph"
+          totalDist={total}
+          segments={segments}
+          classifier={(s) => classifySpeedLimit(s.maxspeed, s.highway)}
+          meta={SPEED_LIMIT_META}
+          profile={profile}
+          pinnedKey={pinned?.key ?? null}
+          onTogglePin={handleTogglePin}
+          onHover={onHover}
+          onHighlightSegment={handleHighlight}
+        />
+      )}
+      {visibleSet.has('cost') && (
+        <StackedBarRow
+          rowKey="cost"
+          title="Cost (×)"
+          tooltip="BRouter way cost factor multiplier ([0, 1.2], (1.2, 1.8], (1.8, 2.4], (2.4, 3.0], (3.0, ∞)). 1.0× equals an ideal road or path; hover any segment to see its exact multiplier or click a class chip to inspect its exact cost subclasses."
+          ariaLabel="Cost factor breakdown"
+          totalDist={total}
+          segments={segments}
+          classifier={costBreakdown.classifier}
+          meta={costBreakdown.meta}
+          subClassifier={costBreakdown.subClassifier}
+          subMeta={costBreakdown.subMeta}
+          profile={profile}
+          pinnedKey={pinned?.key ?? null}
+          onTogglePin={handleTogglePin}
+          onHover={onHover}
+          onHighlightSegment={handleHighlight}
+        />
+      )}
     </div>
   );
 };

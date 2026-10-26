@@ -94,6 +94,8 @@ export interface AvoidArea {
 }
 
 export const MAX_ROUTE_SLOTS = 3;
+export const MAX_ROUTES = 3;
+export const MAX_TOTAL_SLOTS = MAX_ROUTES * MAX_ROUTE_SLOTS;
 
 export interface RouteSlotColor {
   id: string;
@@ -117,7 +119,10 @@ export const ROUTE_COLOR_PALETTE: readonly RouteSlotColor[] = [
 export const ROUTE_SLOT_COLORS = ROUTE_COLOR_PALETTE.slice(0, MAX_ROUTE_SLOTS);
 
 export interface RouteSlotState {
+  routeIdx?: number;
   profile: ProfileName;
+  waypoints: LatLon[];
+  avoidAreas: AvoidArea[];
   alternativeIdx: number;
   route: GeoJSON.FeatureCollection | null;
   isRouting: boolean;
@@ -132,7 +137,7 @@ export function getSlotColor(
     const found = ROUTE_COLOR_PALETTE.find((c) => c.id === slot.colorId);
     if (found) return found;
   }
-  return ROUTE_SLOT_COLORS[slotIdx] || ROUTE_SLOT_COLORS[0];
+  return ROUTE_COLOR_PALETTE[slotIdx % ROUTE_COLOR_PALETTE.length] || ROUTE_COLOR_PALETTE[0];
 }
 
 export interface RouteRequest {
@@ -178,6 +183,9 @@ export interface PointWayInfo {
   noise_class: number;
   traffic_class: number;
   maxspeed: number;
+  town_class?: number;
+  lit?: boolean;
+  sidewalk?: boolean;
 }
 
 export type WorkerMessage =

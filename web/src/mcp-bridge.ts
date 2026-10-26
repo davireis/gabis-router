@@ -129,12 +129,18 @@ function buildStateSnapshot(ctx: McpBridgeContext) {
   };
 
   return {
+    activeSlotIdx: ctx.routing.activeSlotIdx,
+    activeRouteIdx: ctx.routing.activeRouteIdx,
+    routeCount: ctx.routing.routeCount,
     waypoints: ctx.routing.waypoints,
     profile: ctx.routing.profile,
     alternativeIdx: ctx.routing.alternativeIdx,
     slots: ctx.routing.slots.map((s, idx) => ({
       slotIdx: idx,
+      routeIdx: s.routeIdx ?? 0,
       profile: s.profile,
+      waypoints: s.waypoints,
+      avoidAreas: s.avoidAreas,
       alternativeIdx: s.alternativeIdx,
       isRouting: s.isRouting,
       routeSummary: summarizeRoute(s.route, idx),
@@ -145,7 +151,7 @@ function buildStateSnapshot(ctx: McpBridgeContext) {
     isRouting: ctx.routing.isRouting,
     canUndo: ctx.routing.canUndo,
     canRedo: ctx.routing.canRedo,
-    routeSummary: summarizeRoute(ctx.routing.currentRoute, 0),
+    routeSummary: summarizeRoute(ctx.routing.currentRoute, ctx.routing.activeSlotIdx),
     ui: {
       isControlsCollapsed: ctx.ui.isControlsCollapsed,
       isProfileEditorOpen: ctx.ui.isProfileEditorOpen,

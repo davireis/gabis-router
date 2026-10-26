@@ -16,7 +16,12 @@ import {
 } from '../format.ts';
 import { buildProfile } from '../utils/geo.ts';
 import { ElevationChart } from './ElevationChart.tsx';
-import { SurfaceBreakdown } from './SurfaceBreakdown.tsx';
+import {
+  SurfaceBreakdown,
+  BREAKDOWN_BAR_OPTIONS,
+  DEFAULT_BREAKDOWN_BARS,
+  type BreakdownBarId,
+} from './SurfaceBreakdown.tsx';
 import { InfoButton } from './TooltipPopover.tsx';
 import { Icon } from './common/Icon.tsx';
 
@@ -29,6 +34,8 @@ const ALTERNATIVES = [
 
 interface RouteInfoDrawerProps {
   slots: RouteSlotState[];
+  activeSlotIdx?: number;
+  onSelectActiveSlot?: (slotIdx: number) => void;
   getProfileMeta?: (profileId: ProfileName) => ProfileMeta;
   statusMessage?: string;
   units: Units;
@@ -84,6 +91,8 @@ function parseRouteFeatureCollection(
 
 export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
   slots,
+  activeSlotIdx = 0,
+  onSelectActiveSlot,
   getProfileMeta,
   statusMessage,
   units,
@@ -100,6 +109,38 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
     1: isCollapsed,
     2: isCollapsed,
   });
+  const [visibleBars, setVisibleBars] = useState<BreakdownBarId[]>(() => {
+    try {
+      const raw = localStorage.getItem('rsrouter_breakdown_bars');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const validIds = new Set<string>(BREAKDOWN_BAR_OPTIONS.map((o) => o.id));
+          const filtered = parsed.filter((id): id is BreakdownBarId => validIds.has(id));
+          if (filtered.length > 0) return filtered;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return DEFAULT_BREAKDOWN_BARS;
+  });
+
+  const handleToggleBreakdownBar = (barId: BreakdownBarId) => {
+    setVisibleBars((prev) => {
+      const exists = prev.includes(barId);
+      if (exists && prev.length <= 1) return prev;
+      const next = exists
+        ? prev.filter((id) => id !== barId)
+        : BREAKDOWN_BAR_OPTIONS.map((o) => o.id).filter((id) => prev.includes(id) || id === barId);
+      try {
+        localStorage.setItem('rsrouter_breakdown_bars', JSON.stringify(next));
+      } catch {
+        // ignore storage errors
+      }
+      return next;
+    });
+  };
   const internalToggleRef = useRef<boolean>(false);
 
   useEffect(() => {
@@ -134,6 +175,8 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
 
   const isMultiSlot = slots.length > 1;
   const allCollapsed = slots.every((_, idx) => Boolean(collapsedBySlot[idx]));
+  const hasMultiRoutes = slots.some((s) => (s.routeIdx ?? 0) !== (slots[0]?.routeIdx ?? 0));
+  const activeRouteIdx = slots[activeSlotIdx]?.routeIdx ?? 0;
 
   const handleToggleSlot = (slotIdx: number) => {
     const nextVal = !Boolean(collapsedBySlot[slotIdx]);
@@ -158,26 +201,37 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
         const slotColor = getSlotColor(slot, slotIdx);
         const profileMeta = getProfileMeta ? getProfileMeta(slot.profile) : PROFILE_INFO[slot.profile];
         const barCollapsed = Boolean(collapsedBySlot[slotIdx]);
+        const slotRouteIdx = slot.routeIdx ?? 0;
+        const isSlotActive = hasMultiRoutes && slotRouteIdx === activeRouteIdx;
 
         return (
           <div
             key={slotIdx}
             id={slotIdx === 0 ? 'route-bar-0' : `route-bar-${slotIdx}`}
-            className={`route-bar-card ${barCollapsed ? 'collapsed' : ''} ${slot.isRouting ? 'is-routing' : ''}`}
+            className={`route-bar-card ${barCollapsed ? 'collapsed' : ''} ${slot.isRouting ? 'is-routing' : ''} ${isSlotActive ? 'is-active' : ''}`}
             style={{ '--slot-color': slotColor.line } as React.CSSProperties}
           >
             <div
               className="ri-bar-header"
-              onClick={() => handleToggleSlot(slotIdx)}
+              onClick={() => {
+                if (hasMultiRoutes && slotRouteIdx !== activeRouteIdx) {
+                  onSelectActiveSlot?.(slotIdx);
+                }
+                handleToggleSlot(slotIdx);
+              }}
             >
               <div className="ri-bar-identity">
                 <span
                   className={`ri-slot-dot ${slot.isRouting ? 'is-routing' : ''}`}
                   style={{ backgroundColor: slotColor.line }}
-                  title={`Route ${slotIdx + 1} (${slotColor.name})`}
+                  title={`Route ${slotRouteIdx + 1} (${slotColor.name})`}
                 />
                 <span className="ri-slot-title" title={profileMeta?.summary}>
-                  {profileMeta?.label || slot.profile}
+                  {hasMultiRoutes
+                    ? `R${slotRouteIdx + 1} · ${profileMeta?.shortLabel || profileMeta?.label || slot.profile}`
+                    : isMultiSlot
+                      ? profileMeta?.shortLabel || profileMeta?.label || slot.profile
+                      : profileMeta?.label || slot.profile}
                 </span>
                 {routeData && slot.isRouting && (
                   <span
@@ -326,14 +380,36 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
                     id={slotIdx === 0 ? 'surface-details' : `surface-details-${slotIdx}`}
                     className="ri-col ri-col-surface"
                   >
-                    <div className="ri-col-header">
-                      <span className="ri-col-title">Surface &amp; Road Breakdown</span>
+                    <div className="ri-col-header ri-col-header-breakdown">
+                      <span className="ri-col-title">Breakdown</span>
+                      <div
+                        className="breakdown-bar-selector"
+                        role="group"
+                        aria-label="Visible breakdown bars"
+                      >
+                        {BREAKDOWN_BAR_OPTIONS.map((opt) => {
+                          const active = visibleBars.includes(opt.id);
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              className={`breakdown-selector-chip ${active ? 'active' : ''}`}
+                              title={opt.title}
+                              aria-pressed={active}
+                              onClick={() => handleToggleBreakdownBar(opt.id)}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                     <SurfaceBreakdown
                       slotIdx={slotIdx}
                       profile={routeData.profile}
                       segments={routeData.segments}
                       units={units}
+                      visibleBars={visibleBars}
                       onHover={onHoverPosition}
                       onHighlightSegment={onHighlightSegment}
                     />

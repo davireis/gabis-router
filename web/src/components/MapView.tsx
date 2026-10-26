@@ -190,6 +190,8 @@ interface MapViewProps {
   waypoints: LatLon[];
   avoidAreas: AvoidArea[];
   slots: RouteSlotState[];
+  activeSlotIdx?: number;
+  onSelectActiveSlot?: (slotIdx: number) => void;
   segmentHighlight: SegmentHighlight | null;
   hoverPosition: { lat: number; lon: number } | null;
   isOfflineMode: boolean;
@@ -197,7 +199,7 @@ interface MapViewProps {
   thunderforestKey: string;
   fitBoundsSeq: number;
   onAddWaypoint: (point: LatLon, action?: 'start' | 'end' | 'via' | 'append') => void;
-  onInsertWaypointAtLeg: (point: LatLon, index: number) => void;
+  onInsertWaypointAtLeg: (point: LatLon, index: number, targetSlotIdx?: number) => void;
   onMoveWaypoint: (index: number, point: LatLon) => void;
   onRemoveWaypoint: (index: number) => void;
   onRenameWaypoint: (index: number, name: string) => void;
@@ -219,6 +221,8 @@ export const MapView: React.FC<MapViewProps> = ({
   waypoints,
   avoidAreas,
   slots,
+  activeSlotIdx = 0,
+  onSelectActiveSlot,
   segmentHighlight,
   hoverPosition,
   isOfflineMode,
@@ -253,6 +257,10 @@ export const MapView: React.FC<MapViewProps> = ({
   avoidAreasRef.current = avoidAreas;
   const slotsRef = useRef(slots);
   slotsRef.current = slots;
+  const activeSlotIdxRef = useRef(activeSlotIdx);
+  activeSlotIdxRef.current = activeSlotIdx;
+  const onSelectActiveSlotRef = useRef(onSelectActiveSlot);
+  onSelectActiveSlotRef.current = onSelectActiveSlot;
 
   const onAddWaypointRef = useRef(onAddWaypoint);
   onAddWaypointRef.current = onAddWaypoint;
@@ -284,6 +292,7 @@ export const MapView: React.FC<MapViewProps> = ({
   const pendingFitRouteRef = useRef<boolean>(false);
 
   const insertDragRef = useRef<{
+    slotIdx: number;
     leg: number;
     startPoint: { x: number; y: number };
     ghost: maplibregl.Marker | null;
@@ -296,7 +305,7 @@ export const MapView: React.FC<MapViewProps> = ({
     const map = mapRef.current;
     if (!map || !styleReadyRef.current) return;
     syncAvoidAreasLayer(map, avoidAreasRef.current);
-    syncRoutesLayers(map, slotsRef.current);
+    syncRoutesLayers(map, slotsRef.current, activeSlotIdxRef.current);
     syncHighlightLayer(map, segmentHighlight);
   }, [segmentHighlight]);
 
@@ -676,24 +685,32 @@ export const MapView: React.FC<MapViewProps> = ({
       map.getCanvas().style.cursor = '';
     };
 
-    const findClosestRouteCoords = (lng: number, lat: number): number[][] | undefined => {
+    const findClosestRoute = (
+      lng: number,
+      lat: number,
+    ): { coords: number[][]; slotIdx: number } | undefined => {
       let bestCoords: number[][] | undefined;
+      let bestSlotIdx = activeSlotIdxRef.current;
       let bestDistSq = Infinity;
-      for (const slot of slotsRef.current) {
+      slotsRef.current.forEach((slot, slotIdx) => {
         const coords = (
           slot.route?.features[0]?.geometry as GeoJSON.LineString | undefined
         )?.coordinates;
-        if (!coords || coords.length === 0) continue;
+        if (!coords || coords.length === 0) return;
         const idx = nearestVertex(coords, lng, lat);
         const dx = coords[idx][0] - lng;
         const dy = coords[idx][1] - lat;
         const dSq = dx * dx + dy * dy;
-        if (dSq < bestDistSq) {
+        if (
+          dSq < bestDistSq ||
+          (Math.abs(dSq - bestDistSq) < 1e-12 && slotIdx === activeSlotIdxRef.current)
+        ) {
           bestDistSq = dSq;
           bestCoords = coords;
+          bestSlotIdx = slotIdx;
         }
-      }
-      return bestCoords;
+      });
+      return bestCoords ? { coords: bestCoords, slotIdx: bestSlotIdx } : undefined;
     };
 
     // Route dragging insert logic
@@ -703,11 +720,14 @@ export const MapView: React.FC<MapViewProps> = ({
       if ('touches' in orig && orig.touches.length > 1) return;
       if (orig instanceof MouseEvent && orig.button !== 0) return;
       if ((orig.target as HTMLElement)?.closest('.wp-marker')) return;
-      const coords = findClosestRouteCoords(e.lngLat.lng, e.lngLat.lat);
-      const leg = legIndexAt(coords, waypointsRef.current, e.lngLat.lng, e.lngLat.lat);
+      const found = findClosestRoute(e.lngLat.lng, e.lngLat.lat);
+      if (!found) return;
+      const slotWps = slotsRef.current[found.slotIdx]?.waypoints || waypointsRef.current;
+      const leg = legIndexAt(found.coords, slotWps, e.lngLat.lng, e.lngLat.lat);
       if (leg < 0) return;
       e.preventDefault();
       insertDragRef.current = {
+        slotIdx: found.slotIdx,
         leg,
         startPoint: { x: e.point.x, y: e.point.y },
         ghost: null,
@@ -747,10 +767,17 @@ export const MapView: React.FC<MapViewProps> = ({
       drag.ghost?.remove();
       insertDragRef.current = null;
       map.getCanvas().style.cursor = '';
-      if (!drag.hasDragged || !drag.ghost) return;
+      if (!drag.hasDragged || !drag.ghost) {
+        if (drag.slotIdx !== activeSlotIdxRef.current) {
+          suppressClickUntilRef.current = performance.now() + 400;
+          clearSingleClick();
+          onSelectActiveSlotRef.current?.(drag.slotIdx);
+        }
+        return;
+      }
       suppressClickUntilRef.current = performance.now() + 400;
       const { lat, lng } = drag.ghost.getLngLat();
-      onInsertWaypointAtLegRef.current({ lat, lon: lng }, drag.leg + 1);
+      onInsertWaypointAtLegRef.current({ lat, lon: lng }, drag.leg + 1, drag.slotIdx);
     };
 
     map.on('mousedown', 'route-hit', beginInsert);
@@ -769,10 +796,10 @@ export const MapView: React.FC<MapViewProps> = ({
     });
     map.on('mousemove', 'route-hit', (e) => {
       if (insertDragRef.current?.hasDragged || draggingMarkerIndexRef.current !== null) return;
-      const coords = findClosestRouteCoords(e.lngLat.lng, e.lngLat.lat);
-      if (coords && coords.length > 0) {
-        const idx = nearestVertex(coords, e.lngLat.lng, e.lngLat.lat);
-        onHoverPositionRef.current?.({ lon: coords[idx][0], lat: coords[idx][1] });
+      const found = findClosestRoute(e.lngLat.lng, e.lngLat.lat);
+      if (found && found.coords.length > 0) {
+        const idx = nearestVertex(found.coords, e.lngLat.lng, e.lngLat.lat);
+        onHoverPositionRef.current?.({ lon: found.coords[idx][0], lat: found.coords[idx][1] });
       }
     });
     map.on('mouseleave', 'route-hit', () => {
@@ -804,14 +831,14 @@ export const MapView: React.FC<MapViewProps> = ({
 
   useEffect(() => {
     if (mapRef.current && styleReadyRef.current) {
-      syncRoutesLayers(mapRef.current, slots);
+      syncRoutesLayers(mapRef.current, slots, activeSlotIdx);
       const anyRoute = slots.some((s) => Boolean(s.route?.features?.length));
       if (anyRoute && pendingFitRouteRef.current) {
         pendingFitRouteRef.current = false;
         fitRouteBounds(mapRef.current, slots, waypointsRef.current, true);
       }
     }
-  }, [slots]);
+  }, [slots, activeSlotIdx]);
 
   // Fit bounds only when explicitly requested via fitBoundsSeq (initial load, import GPX, etc.)
   useEffect(() => {

@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   classifyRoad,
   classifyRoadGroup,
+  classifyArea,
+  classifyAreaSubclass,
   classifySurface,
   classifySurfaceSubclass,
   classifyTraffic,
@@ -14,6 +16,8 @@ import {
   buildCostBreakdown,
   ROAD_META,
   ROAD_GROUP_META,
+  AREA_META,
+  AREA_SUB_META,
   SURFACE_META,
   SURFACE_SUB_META,
   TRAFFIC_META,
@@ -32,31 +36,36 @@ test('classifyRoad & classifyRoadGroup: maps OSM highway tags to road subclasses
 
   for (const h of ['residential', 'living_street']) {
     assert.equal(classifyRoad(h), 'residential');
-    assert.equal(classifyRoadGroup(h), 'minor_road');
+    assert.equal(classifyRoadGroup(h), 'small_road');
   }
   assert.equal(classifyRoad('unclassified'), 'unclassified');
-  assert.equal(classifyRoadGroup('unclassified'), 'minor_road');
+  assert.equal(classifyRoadGroup('unclassified'), 'small_road');
   assert.equal(classifyRoad('service'), 'service');
-  assert.equal(classifyRoadGroup('service'), 'minor_road');
+  assert.equal(classifyRoadGroup('service'), 'small_road');
 
   for (const h of ['tertiary', 'tertiary_link']) {
     assert.equal(classifyRoad(h), 'tertiary');
-    assert.equal(classifyRoadGroup(h), 'main_road');
+    assert.equal(classifyRoadGroup(h), 'small_road');
   }
 
   for (const h of ['secondary', 'secondary_link']) {
     assert.equal(classifyRoad(h), 'secondary');
-    assert.equal(classifyRoadGroup(h), 'main_road');
+    assert.equal(classifyRoadGroup(h), 'b_road');
   }
 
   for (const h of ['primary', 'primary_link']) {
     assert.equal(classifyRoad(h), 'primary');
-    assert.equal(classifyRoadGroup(h), 'arterial_road');
+    assert.equal(classifyRoadGroup(h), 'a_road');
   }
 
-  for (const h of ['trunk', 'trunk_link', 'motorway', 'motorway_link']) {
+  for (const h of ['trunk', 'trunk_link']) {
     assert.equal(classifyRoad(h), 'trunk');
-    assert.equal(classifyRoadGroup(h), 'arterial_road');
+    assert.equal(classifyRoadGroup(h), 'a_road');
+  }
+
+  for (const h of ['motorway', 'motorway_link']) {
+    assert.equal(classifyRoad(h), 'motorway');
+    assert.equal(classifyRoadGroup(h), 'motorway');
   }
 
   assert.equal(classifyRoad('track'), 'track');
@@ -129,6 +138,7 @@ test('classifyRoad, classifySurface, classifyTraffic & classifyNoise: all classe
     'secondary',
     'primary',
     'trunk',
+    'motorway',
     'track',
     'bridleway',
     'path',
@@ -166,7 +176,8 @@ test('classifyRoad, classifySurface, classifyTraffic & classifyNoise: all classe
   assert.equal(classifyTraffic(0, 'residential'), 'quiet');
   assert.equal(classifyTrafficSubclass(0, 'residential'), 'class_0');
   assert.equal(classifyTraffic(1, 'residential'), 'quiet');
-  assert.equal(classifyTraffic(3, 'secondary'), 'quiet');
+  assert.equal(classifyTraffic(3, 'secondary'), 'fair');
+  assert.equal(classifyTrafficSubclass(3, 'secondary'), 'class_3');
   assert.equal(classifyTrafficSubclass(1, 'residential'), 'class_1');
   assert.equal(classifyTraffic(4, 'secondary'), 'busy');
   assert.equal(classifyTraffic(5, 'primary'), 'busy');
@@ -225,31 +236,68 @@ test('classifySpeedLimit: car-free infrastructure, explicit km/h limits, and unt
   }
 });
 
-test('classifyCost and buildCostBreakdown map segment costfactors to 1–1.5, 1.5–2, 2–3, 3+ buckets and exact subclasses', () => {
+test('classifyCost and buildCostBreakdown map segment costfactors to [0, 1.2], (1.2, 1.8], (1.8, 2.4], (2.4, 3.0], (3.0, ∞) buckets and exact subclasses', () => {
   const segments = [
-    { from: 0, to: 500, surface: 'asphalt', highway: 'cycleway', costfactor: 1.2 },
-    { from: 500, to: 700, surface: 'asphalt', highway: 'residential', costfactor: 1.8 },
-    { from: 700, to: 850, surface: 'asphalt', highway: 'tertiary', costfactor: 2.5 },
+    { from: 0, to: 400, surface: 'asphalt', highway: 'cycleway', costfactor: 1.2 },
+    { from: 400, to: 600, surface: 'asphalt', highway: 'residential', costfactor: 1.8 },
+    { from: 600, to: 750, surface: 'asphalt', highway: 'tertiary', costfactor: 2.2 },
+    { from: 750, to: 850, surface: 'asphalt', highway: 'secondary', costfactor: 2.8 },
     { from: 850, to: 1000, surface: 'asphalt', highway: 'primary', costfactor: 3.4 },
   ];
 
-  assert.equal(classifyCost(1.0), 'c1_15');
-  assert.equal(classifyCost(1.5), 'c1_15');
-  assert.equal(classifyCost(1.51), 'c15_2');
-  assert.equal(classifyCost(2.0), 'c15_2');
-  assert.equal(classifyCost(2.5), 'c2_3');
-  assert.equal(classifyCost(3.0), 'c2_3');
-  assert.equal(classifyCost(3.1), 'c3_plus');
+  assert.equal(classifyCost(1.0), 'c0_12');
+  assert.equal(classifyCost(1.2), 'c0_12');
+  assert.equal(classifyCost(1.21), 'c12_18');
+  assert.equal(classifyCost(1.8), 'c12_18');
+  assert.equal(classifyCost(1.81), 'c18_24');
+  assert.equal(classifyCost(2.4), 'c18_24');
+  assert.equal(classifyCost(2.41), 'c24_30');
+  assert.equal(classifyCost(3.0), 'c24_30');
+  assert.equal(classifyCost(3.1), 'c30_plus');
 
   const { classifier, meta, subClassifier, subMeta } = buildCostBreakdown(segments);
-  assert.equal(classifier(segments[0]), 'c1_15');
-  assert.equal(classifier(segments[1]), 'c15_2');
-  assert.equal(classifier(segments[2]), 'c2_3');
-  assert.equal(classifier(segments[3]), 'c3_plus');
-  assert.equal(meta.c1_15.label, '[1, 1.5]');
-  assert.equal(meta.c15_2.label, '(1.5, 2]');
-  assert.equal(meta.c2_3.label, '(2, 3]');
-  assert.equal(meta.c3_plus.label, '(3, ∞)');
+  assert.equal(classifier(segments[0]), 'c0_12');
+  assert.equal(classifier(segments[1]), 'c12_18');
+  assert.equal(classifier(segments[2]), 'c18_24');
+  assert.equal(classifier(segments[3]), 'c24_30');
+  assert.equal(classifier(segments[4]), 'c30_plus');
+  assert.equal(meta.c0_12.label, '[0, 1.2]');
+  assert.equal(meta.c12_18.label, '(1.2, 1.8]');
+  assert.equal(meta.c18_24.label, '(1.8, 2.4]');
+  assert.equal(meta.c24_30.label, '(2.4, 3.0]');
+  assert.equal(meta.c30_plus.label, '(3.0, ∞)');
   assert.equal(subClassifier(segments[0]), '1.20');
   assert.equal(subMeta['1.20'].label, '1.20×');
+});
+
+test('classifyArea & classifyAreaSubclass: distinguishes urban from countryside using town class, lit, and residential streets', () => {
+  assert.equal(classifyAreaSubclass({ town: 3, lit: true }), 'town_3');
+  assert.equal(classifyArea({ town: 3, lit: true }), 'urban');
+
+  assert.equal(classifyAreaSubclass({ town: 1, lit: false }), 'town_1');
+  assert.equal(classifyArea({ town: 1, lit: false }), 'urban');
+
+  assert.equal(classifyAreaSubclass({ town: 6, lit: false }), 'town_6');
+  assert.equal(classifyArea({ town: 6, lit: false }), 'urban');
+
+  assert.equal(classifyAreaSubclass({ town: 0, lit: true }), 'lit');
+  assert.equal(classifyArea({ town: 0, lit: true }), 'urban');
+
+  assert.equal(classifyAreaSubclass({ highway: 'secondary', town: 0, lit: false, sidewalk: true }), 'sidewalk');
+  assert.equal(classifyArea({ highway: 'secondary', town: 0, lit: false, sidewalk: true }), 'urban');
+
+  assert.equal(classifyAreaSubclass({ highway: 'residential', town: 0, lit: false }), 'residential');
+  assert.equal(classifyArea({ highway: 'residential', town: 0, lit: false }), 'urban');
+
+  assert.equal(classifyAreaSubclass({ highway: 'tertiary', town: 0, lit: false }), 'unlit');
+  assert.equal(classifyArea({ highway: 'tertiary', town: 0, lit: false }), 'countryside');
+
+  assert.equal(AREA_META.urban.color, '#f97316');
+  assert.ok(AREA_META.countryside.label);
+  assert.ok(AREA_META.urban.label);
+  assert.equal(AREA_SUB_META.unlit.parent, 'countryside');
+  assert.equal(AREA_SUB_META.residential.parent, 'urban');
+  assert.equal(AREA_SUB_META.sidewalk.parent, 'urban');
+  assert.equal(AREA_SUB_META.lit.parent, 'urban');
+  assert.equal(AREA_SUB_META.town_3.parent, 'urban');
 });

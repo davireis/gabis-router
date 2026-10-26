@@ -576,8 +576,10 @@ export const WaypointList: React.FC<WaypointListProps> = ({
     isOnlineMode() &&
     waypoints.some((w) => !w.name && !attemptedCoordsRef.current.has(wpCoordKey(w)));
 
+  const isScrollable = rows.length > 4;
+
   return (
-    <div className="waypoints-container" ref={containerRef}>
+    <div className={`waypoints-container ${isScrollable ? 'is-scrollable' : ''}`} ref={containerRef}>
       {n > AUTO_GEOCODE_MAX_POINTS && hasUnattemptedWaypoints && !isGeocodingAny && (
         <div className="avoid-list-header" style={{ marginBottom: '4px' }}>
           <span className="avoid-list-title">Auto-geocoding paused ({n} points)</span>
@@ -595,7 +597,11 @@ export const WaypointList: React.FC<WaypointListProps> = ({
       )}
 
       <div className="waypoints-list-and-swap">
-        <div id="waypoint-list" ref={listRef}>
+        <div
+          id="waypoint-list"
+          ref={listRef}
+          className={isScrollable ? 'is-scrollable' : undefined}
+        >
         {rows.map((row, rIdx) => {
           const w = row.waypoint;
           const wpIdx = row.waypointIndex;

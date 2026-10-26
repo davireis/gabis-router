@@ -2,7 +2,10 @@
 //! surface/highway segment breakdowns, and custom product profiles.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::Instant;
 
+use brouter_rs::rd5::rd5_slice::{FileRd5SegmentReader, LazyRd5Provider};
 use brouter_rs::rd5::tile_manager::TileManager;
 use brouter_rs::{AStarRouter, LookupData, Profile, RouteRequest, RoutingGraph, RoutingOptions};
 
@@ -141,11 +144,31 @@ fn test_gpx_map_matching_and_via_correction() {
             lookups: &lookups,
             profile: &profile,
             gpx_xml: &detour_gpx,
-            options: mm_opts,
+            options: mm_opts.clone(),
         })
         .expect("Detour minimal waypoint extraction failed");
     assert_eq!(detour_wps.len(), 3);
     assert!((detour_matched.total_distance_m - detour_full_match.total_distance_m).abs() < 25.0);
+
+    // Verify lazy cell-provider GPX map-matching (WASM path)
+    let reader = Arc::new(FileRd5SegmentReader::new(repo_path("data/segments4")));
+    let provider = Arc::new(LazyRd5Provider::new(reader));
+    let mut lazy_graph = RoutingGraph::with_cell_provider(provider);
+    let t0 = Instant::now();
+    let (lazy_wps, lazy_matched) = router
+        .extract_gpx_waypoints(GpxMatchRequest {
+            graph: &mut lazy_graph,
+            lookups: &lookups,
+            profile: &profile,
+            gpx_xml: &detour_gpx,
+            options: mm_opts,
+        })
+        .expect("Lazy GPX minimal waypoint extraction failed");
+    let lazy_ms = t0.elapsed().as_secs_f64() * 1000.0;
+    eprintln!("Lazy GPX extract_gpx_waypoints completed in {lazy_ms:.1} ms");
+    assert_eq!(lazy_wps.len(), 3);
+    assert!((lazy_matched.total_distance_m - detour_full_match.total_distance_m).abs() < 25.0);
+    assert!(lazy_graph.has_cell_provider(), "CellProvider should be restored after GPX match");
 }
 
 #[test]

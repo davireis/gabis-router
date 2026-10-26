@@ -1,7 +1,7 @@
 import type maplibregl from 'maplibre-gl';
 import {
   getSlotColor,
-  MAX_ROUTE_SLOTS,
+  MAX_TOTAL_SLOTS,
   type AvoidArea,
   type LatLon,
   type RouteSlotState,
@@ -76,15 +76,24 @@ export function syncAvoidAreasLayer(map: maplibregl.Map, avoidAreas: AvoidArea[]
   }
 }
 
-export function syncRoutesLayers(map: maplibregl.Map, slots: RouteSlotState[]) {
+export function syncRoutesLayers(
+  map: maplibregl.Map,
+  slots: RouteSlotState[],
+  activeSlotIdx = 0,
+) {
   const hitFeatures: GeoJSON.Feature[] = [];
 
-  // Create/update sources and layers in reverse slot order (2 -> 1 -> 0) so slot 0 renders on top
-  for (let slotIdx = MAX_ROUTE_SLOTS - 1; slotIdx >= 0; slotIdx--) {
+  // Create/update sources and layers in reverse slot order
+  for (let slotIdx = MAX_TOTAL_SLOTS - 1; slotIdx >= 0; slotIdx--) {
     const slot = slots[slotIdx];
     const data: GeoJSON.FeatureCollection = slot?.route || EMPTY_FC;
     if (slot?.route?.features) {
-      hitFeatures.push(...slot.route.features);
+      for (const f of slot.route.features) {
+        hitFeatures.push({
+          ...f,
+          properties: { ...(f.properties || {}), slotIdx },
+        });
+      }
     }
 
     const sourceId = slotIdx === 0 ? 'route' : `route-${slotIdx}`;
@@ -112,7 +121,7 @@ export function syncRoutesLayers(map: maplibregl.Map, slots: RouteSlotState[]) {
       }
       if (map.getLayer(casingId)) map.setPaintProperty(casingId, 'line-color', color.casing);
       if (map.getLayer(lineId)) map.setPaintProperty(lineId, 'line-color', color.line);
-    } else {
+    } else if (slotIdx < Math.max(3, slots.length)) {
       map.addSource(sourceId, { type: 'geojson', data });
       map.addLayer({
         id: haloId,
@@ -167,7 +176,7 @@ export function syncRoutesLayers(map: maplibregl.Map, slots: RouteSlotState[]) {
     });
   }
 
-  ensureRouteLayerOrder(map);
+  ensureRouteLayerOrder(map, slots, activeSlotIdx);
 }
 
 function getFirstLabelLayerId(map: maplibregl.Map): string | undefined {
@@ -190,18 +199,33 @@ function getFirstLabelLayerId(map: maplibregl.Map): string | undefined {
   return undefined;
 }
 
-function ensureRouteLayerOrder(map: maplibregl.Map) {
+function slotLayerIds(slotIdx: number): [string, string, string] {
+  const prefix = slotIdx === 0 ? 'route' : `route-${slotIdx}`;
+  return [`${prefix}-halo`, `${prefix}-casing`, `${prefix}-line`];
+}
+
+function ensureRouteLayerOrder(
+  map: maplibregl.Map,
+  slots: RouteSlotState[],
+  activeSlotIdx = 0,
+) {
   const beforeId = getFirstLabelLayerId(map);
+  const activeRouteIdx = slots[activeSlotIdx]?.routeIdx ?? 0;
+  const inactiveRouteSlots: number[] = [];
+  const activeRouteSlots: number[] = [];
+  for (let i = MAX_TOTAL_SLOTS - 1; i >= 0; i--) {
+    if (i === activeSlotIdx) continue;
+    const rIdx = slots[i]?.routeIdx ?? 0;
+    if (rIdx === activeRouteIdx) {
+      activeRouteSlots.push(i);
+    } else {
+      inactiveRouteSlots.push(i);
+    }
+  }
+  const slotOrder: number[] = [...inactiveRouteSlots, ...activeRouteSlots, activeSlotIdx];
+
   const orderedIds = [
-    'route-2-halo',
-    'route-2-casing',
-    'route-2-line',
-    'route-1-halo',
-    'route-1-casing',
-    'route-1-line',
-    'route-halo',
-    'route-casing',
-    'route-line',
+    ...slotOrder.flatMap((idx) => slotLayerIds(idx)),
     'route-hit',
     'route-segment-halo',
     'route-segment-line',
@@ -323,6 +347,18 @@ export function fitRouteBounds(
             count++;
           }
         }
+      }
+    }
+  }
+
+  if (count === 0) {
+    for (const slot of slots) {
+      for (const wp of slot.waypoints || []) {
+        if (wp.lon < minLon) minLon = wp.lon;
+        if (wp.lon > maxLon) maxLon = wp.lon;
+        if (wp.lat < minLat) minLat = wp.lat;
+        if (wp.lat > maxLat) maxLat = wp.lat;
+        count++;
       }
     }
   }

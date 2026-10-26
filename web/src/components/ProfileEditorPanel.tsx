@@ -236,14 +236,21 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
     lastSubmittedDslRef.current = dslText;
     routing.updateCustomProfileDsl(targetId, dslText, false);
 
-    const prevPrimary = routing.slots[0]?.profile;
+    const activeRouteSlots = routing.slots.filter(
+      (s) => (s.routeIdx ?? 0) === routing.activeRouteIdx,
+    );
+    const primarySlotIdx = routing.slots.findIndex(
+      (s) => (s.routeIdx ?? 0) === routing.activeRouteIdx,
+    );
+    const targetSlotIdx = primarySlotIdx !== -1 ? primarySlotIdx : 0;
+    const prevPrimary = routing.slots[targetSlotIdx]?.profile;
     if (prevPrimary !== targetId) {
-      routing.setSlotProfile(0, targetId);
+      routing.setSlotProfile(targetSlotIdx, targetId);
     }
 
     const compareProf =
       prevPrimary && !prevPrimary.startsWith('custom:') ? prevPrimary : baseTemplate;
-    if (routing.slots.length === 1) {
+    if (activeRouteSlots.length === 1) {
       routing.addProfileSlot(compareProf);
     }
   }, []);
@@ -613,7 +620,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
             </summary>
             <div className="pe-section-content">
               <div className="pe-subsection-header">
-                <span>2a. Arterial (trunk, primary)</span>
+                <span>2a. A-Roads (trunk, primary)</span>
                 <span className="pe-section-badge pe-badge-a">+0–10</span>
               </div>
               <SliderRow
@@ -625,7 +632,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 step={0.1}
                 formatValue={(v) => `+${Number(v.toFixed(1))}`}
                 disallowable
-                tooltip="Additive penalty (+0.0 = no penalty) for OSM highway=trunk and trunk_link: primary UK red-sign A-roads and TfL Red Routes. Applies to all non-motorroad trunk roads when the urban trunk toggle in Section 1 is off, or only to non-urban trunks when urban trunks are treated as primary roads. Trunk roads tagged motorroad=yes are always forbidden (10000)."
+                tooltip="Additive penalty (+0.0 = no penalty) for OSM highway=trunk and trunk_link: UK Primary Route Network A-roads (green-signed strategic routes and TfL Red Routes). Applies to all non-motorroad trunk roads when the urban trunk toggle in Section 1 is off, or only to non-urban trunks when urban trunks are treated as primary roads. Trunk roads tagged motorroad=yes are always forbidden (10000)."
                 onChange={(v) => handleAxisChange('trunkCost', v)}
               />
               <SliderRow
@@ -637,12 +644,12 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 step={0.1}
                 formatValue={(v) => `+${Number(v.toFixed(1))}`}
                 disallowable
-                tooltip="Additive penalty (+0.0 = no penalty) for OSM highway=primary and primary_link: major arterial roads linking large towns or city districts (typically standard UK A-roads)."
+                tooltip="Additive penalty (+0.0 = no penalty) for OSM highway=primary and primary_link: non-primary UK A-roads (white-signed A-roads linking towns and urban districts)."
                 onChange={(v) => handleAxisChange('primaryCost', v)}
               />
 
               <div className="pe-subsection-header pe-subsection-divider">
-                <span>2b. Main (secondary, tertiary)</span>
+                <span>2b. B-Roads (secondary)</span>
                 <span className="pe-section-badge pe-badge-a">+0–10</span>
               </div>
               <SliderRow
@@ -654,9 +661,14 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 step={0.1}
                 formatValue={(v) => `+${Number(v.toFixed(1))}`}
                 disallowable
-                tooltip="Additive penalty (+0.0 = no penalty) for OSM highway=secondary and secondary_link: distributor roads connecting smaller towns and urban neighbourhoods (typically UK B-roads)."
+                tooltip="Additive penalty (+0.0 = no penalty) for OSM highway=secondary and secondary_link: UK B-roads connecting smaller towns and urban neighbourhoods."
                 onChange={(v) => handleAxisChange('secondaryCost', v)}
               />
+
+              <div className="pe-subsection-header pe-subsection-divider">
+                <span>2c. Small Roads (tertiary, unclassified, residential, service)</span>
+                <span className="pe-section-badge pe-badge-a">+0–10</span>
+              </div>
               <SliderRow
                 id="pe-tertiary-cost"
                 label="Tertiary (highway=tertiary)"
@@ -666,14 +678,9 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 step={0.1}
                 formatValue={(v) => `+${Number(v.toFixed(1))}`}
                 disallowable
-                tooltip="Additive penalty (+0.0 = no penalty) for OSM highway=tertiary and tertiary_link: local collector streets linking villages, suburbs, and residential estates (classified C-roads)."
+                tooltip="Additive penalty (+0.0 = no penalty) for OSM highway=tertiary and tertiary_link: classified unnumbered UK C-roads and local collector streets linking villages, suburbs, and estates."
                 onChange={(v) => handleAxisChange('tertiaryCost', v)}
               />
-
-              <div className="pe-subsection-header pe-subsection-divider">
-                <span>2c. Minor (unclassified, residential, service)</span>
-                <span className="pe-section-badge pe-badge-a">+0–10</span>
-              </div>
               <SliderRow
                 id="pe-unclassified-cost"
                 label="Unclassified (highway=unclassified)"

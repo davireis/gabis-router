@@ -4,6 +4,7 @@ import type { useOffline } from '../hooks/useOffline.ts';
 import {
   getSlotColor,
   MAX_ROUTE_SLOTS,
+  MAX_ROUTES,
   PROFILE_INFO,
   PROFILE_ORDER,
   ROUTE_COLOR_PALETTE,
@@ -156,6 +157,9 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
   };
 
   const isBusy = routing.isRouting || offline.downloadProgress.active;
+  const activeRouteSlots = routing.slots
+    .map((slot, slotIdx) => ({ slot, slotIdx }))
+    .filter(({ slot }) => (slot.routeIdx ?? 0) === routing.activeRouteIdx);
 
   return (
     <div
@@ -178,12 +182,93 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
         />
 
         <div className="route-section" ref={routeSectionRef}>
+          <div className="route-tabs-bar" role="tablist" aria-label="Routes">
+            <div className="route-tabs-list">
+              {Array.from({ length: routing.routeCount }).map((_, rIdx) => {
+                const rSlots = routing.slots
+                  .map((slot, slotIdx) => ({ slot, slotIdx }))
+                  .filter(({ slot }) => (slot.routeIdx ?? 0) === rIdx);
+                const isRouteActive = rIdx === routing.activeRouteIdx;
+                const isRouteRouting = rSlots.some(({ slot }) => slot.isRouting);
+                const primaryEntry = rSlots[0];
+                const primaryColor = primaryEntry
+                  ? getSlotColor(primaryEntry.slot, primaryEntry.slotIdx)
+                  : ROUTE_COLOR_PALETTE[0];
+                const wpCount = primaryEntry?.slot.waypoints.length ?? 0;
+                return (
+                  <div
+                    key={rIdx}
+                    className={`route-tab ${isRouteActive ? 'active' : ''}`}
+                    style={
+                      isRouteActive
+                        ? ({ '--route-tab-color': primaryColor.line } as React.CSSProperties)
+                        : undefined
+                    }
+                  >
+                    <button
+                      id={`btn-route-tab-${rIdx}`}
+                      type="button"
+                      role="tab"
+                      aria-selected={isRouteActive}
+                      className="route-tab-btn"
+                      title={`Switch to Route ${rIdx + 1} (${wpCount} points)`}
+                      onClick={() => routing.setActiveRoute(rIdx)}
+                    >
+                      <span
+                        className={`route-tab-dot ${isRouteRouting ? 'is-routing' : ''}`}
+                        style={{ backgroundColor: primaryColor.line }}
+                      />
+                      <span>Route {rIdx + 1}</span>
+                    </button>
+                    {routing.routeCount > 1 && (
+                      <button
+                        id={`btn-remove-route-${rIdx}`}
+                        type="button"
+                        className="route-tab-close"
+                        title={`Remove Route ${rIdx + 1}`}
+                        aria-label={`Remove Route ${rIdx + 1}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          routing.removeRoute(rIdx);
+                        }}
+                      >
+                        <Icon name="close" size={11} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {routing.routeCount < MAX_ROUTES && (
+              <div className="route-tabs-actions">
+                <button
+                  id="btn-add-route"
+                  type="button"
+                  className="btn-toolbar-mini btn-add-route"
+                  title="Add a new empty route with its own profile selector"
+                  onClick={() => routing.addRoute('empty')}
+                >
+                  <span>+ Route</span>
+                </button>
+                <button
+                  id="btn-clone-route"
+                  type="button"
+                  className="btn-toolbar-mini btn-clone-route"
+                  title="Clone current route waypoints and profile into a new route"
+                  onClick={() => routing.addRoute('clone')}
+                >
+                  <span>Clone</span>
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="field profile-field">
             <div className="profile-field-header">
               <label htmlFor="profile-select" className="profile-header-label">
-                <span>{routing.slots.length > 1 ? 'Profiles' : 'Profile'}</span>
+                <span>{activeRouteSlots.length > 1 ? 'Compared Profiles' : 'Profile'}</span>
                 <InfoButton
-                  tooltip={`${routing.getProfileMeta(routing.profile)?.summary || ''} Profiles score every road segment by surface, traffic, hills, and cycle infrastructure. Add up to 3 profiles to compare routes side by side.`}
+                  tooltip={`${routing.getProfileMeta(routing.profile)?.summary || ''} Use + Profile to compare profiles on the same waypoints, or + Route / Clone above to work on an independent route.`}
                   ariaLabel="About Routing Profiles"
                 />
               </label>
@@ -198,34 +283,37 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
                   <Icon name="sliders" size={11} />
                   <span>{isProfileEditorOpen ? 'Close Editor' : 'Edit Profile'}</span>
                 </button>
-                {routing.slots.length < MAX_ROUTE_SLOTS && (
+                {activeRouteSlots.length < MAX_ROUTE_SLOTS && (
                   <button
                     id="btn-add-compare-profile"
                     type="button"
                     className="btn-toolbar-mini btn-add-profile"
-                    title="Compare with another routing profile (up to 3)"
+                    title="Compare another profile on this route's waypoints"
                     onClick={() => routing.addProfileSlot()}
                   >
-                    <span>+ Compare</span>
+                    <span>+ Profile</span>
                   </button>
                 )}
               </div>
             </div>
 
             <div className="profile-slots-list">
-              {routing.slots.map((slot, slotIdx) => {
+              {activeRouteSlots.map(({ slot, slotIdx }, localIdx) => {
                 const slotColor = getSlotColor(slot, slotIdx);
                 const isPickerOpen = openColorSlotIdx === slotIdx;
                 const slotMeta = routing.getProfileMeta(slot.profile);
                 return (
-                  <div key={slotIdx} className={`profile-slot-row ${slot.isRouting ? 'is-routing' : ''}`}>
+                  <div
+                    key={slotIdx}
+                    className={`profile-slot-row ${slot.isRouting ? 'is-routing' : ''}`}
+                  >
                     <div className="profile-color-picker-wrap">
                       <button
                         type="button"
                         className={`profile-slot-dot profile-slot-dot-btn ${isPickerOpen ? 'active' : ''} ${slot.isRouting ? 'is-routing' : ''}`}
                         style={{ backgroundColor: slotColor.line }}
-                        title={`Route ${slotIdx + 1} colour: ${slotColor.name} (click to change)`}
-                        aria-label={`Change route ${slotIdx + 1} colour (${slotColor.name})`}
+                        title={`Colour: ${slotColor.name} (click to change)`}
+                        aria-label={`Change colour (${slotColor.name})`}
                         aria-expanded={isPickerOpen}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -258,7 +346,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
                       )}
                     </div>
                     <select
-                      id={slotIdx === 0 ? 'profile-select' : `profile-select-${slotIdx}`}
+                      id={localIdx === 0 ? 'profile-select' : `profile-select-${localIdx}`}
                       value={slot.profile}
                       title={slotMeta.summary}
                       onChange={(e) => routing.setSlotProfile(slotIdx, e.target.value as ProfileName)}
@@ -283,14 +371,17 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
                         ))}
                       </optgroup>
                     </select>
-                    {routing.slots.length > 1 && (
+                    {activeRouteSlots.length > 1 && (
                       <button
-                        id={`btn-remove-profile-${slotIdx}`}
+                        id={`btn-remove-profile-${localIdx}`}
                         type="button"
                         className="wp-btn wp-btn-remove profile-slot-remove"
-                        title="Remove this profile from comparison"
-                        aria-label={`Remove profile ${slotIdx + 1}`}
-                        onClick={() => routing.removeProfileSlot(slotIdx)}
+                        title="Remove compared profile"
+                        aria-label={`Remove profile ${localIdx + 1}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          routing.removeProfileSlot(slotIdx);
+                        }}
                       >
                         <Icon name="close" size={13} />
                       </button>
@@ -399,7 +490,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
               type="button"
               className="btn btn-outline btn-action-compact"
               title="Copy shareable route link"
-              disabled={routing.waypoints.length < 2}
+              disabled={!routing.slots.some((s) => s.waypoints.length >= 2)}
               onClick={handleShare}
             >
               <Icon name={shareCopied ? 'check' : 'share'} size={13} />
@@ -410,7 +501,11 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
               id="btn-export-gpx"
               type="button"
               className="btn btn-primary btn-action-compact"
-              title="Download primary route as GPX file"
+              title={
+                routing.slots.length > 1
+                  ? `Download Route ${routing.activeSlotIdx + 1} as GPX file`
+                  : 'Download route as GPX file'
+              }
               disabled={!routing.currentRoute}
               onClick={handleExportGpx}
             >
