@@ -18,8 +18,8 @@ interface ProfileEditorPanelProps {
 }
 
 const BASE_TEMPLATE_ORDER: BaseTemplateId[] = [
-  'gabis-safe-road',
   'gabis-fast-city',
+  'gabis-safe-road',
   'gabis-lite-gravel',
 ];
 
@@ -185,9 +185,9 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
   const initialCustom = routing.customProfiles.find((c) => c.id === routing.profile);
   const initialTemplate: BaseTemplateId =
     initialCustom?.baseTemplate ||
-    (routing.profile === 'gabis-fast-city' || routing.profile === 'gabis-lite-gravel'
+    (routing.profile === 'gabis-safe-road' || routing.profile === 'gabis-lite-gravel'
       ? (routing.profile as BaseTemplateId)
-      : 'gabis-safe-road');
+      : 'gabis-fast-city');
 
   const [selectedSource, setSelectedSource] = useState<string>(
     initialCustom ? initialCustom.id : initialTemplate,
@@ -606,7 +606,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 id="pe-allow-urban-trunks"
                 label="Treat urban trunk A-roads as primary (lit & ≤ 30 mph)"
                 checked={axes.allowUrbanTrunks}
-                tooltip="When enabled (as in Fast City), urban highway=trunk roads that are both lit=yes and posted ≤ 30 mph (maxspeed=10|20|30|40|50|urban in BRouter's km/h lookup) use the Primary (highway=primary) penalty instead of the Trunk penalty. When disabled (as in Safe Road), all non-motorroad trunk roads use the Trunk penalty in Section 2."
+                tooltip="When enabled (as in Fast Bike), urban highway=trunk roads that are both lit=yes and posted ≤ 30 mph (maxspeed=10|20|30|40|50|urban in BRouter's km/h lookup) use the Primary (highway=primary) penalty instead of the Trunk penalty. When disabled (as in Safe Road), all non-motorroad trunk roads use the Trunk penalty in Section 2."
                 onChange={(v) => handleAxisChange('allowUrbanTrunks', v)}
               />
             </div>
@@ -1469,10 +1469,10 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
             </div>
           </details>
 
-          {/* Section 8: Turns, Signals & Barriers (all 0 to 300 m) */}
+          {/* Section 8: Turns, Junctions & Barriers (all 0 to 300 m) */}
           <details className={`pe-section ${!axes.enableTurnPenalties ? 'pe-section-disabled' : ''}`}>
             <summary className="pe-section-summary">
-              <span>8. Turns, Signals &amp; Barriers</span>
+              <span>8. Turns, Junctions &amp; Barriers</span>
               <div className="pe-section-summary-right">
                 <span className={`pe-section-badge ${axes.enableTurnPenalties ? 'pe-badge-c' : 'pe-badge-off'}`}>
                   {axes.enableTurnPenalties ? '+0–300 m' : 'Off'}
@@ -1480,13 +1480,17 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 <SectionSummarySwitch
                   id="pe-enable-turns"
                   checked={axes.enableTurnPenalties}
-                  label="Turn, Signal & Barrier Penalties"
+                  label="Turn, Junction & Barrier Penalties"
                   onChange={(v) => handleAxisChange('enableTurnPenalties', v)}
                 />
               </div>
             </summary>
             <div className="pe-section-content">
               <div className={`pe-section-subcontrols ${!axes.enableTurnPenalties ? 'pe-content-disabled' : ''}`}>
+                <div className="pe-subsection-header">
+                  <span>8a. Turn Geometry (turncost)</span>
+                  <span className="pe-section-badge pe-badge-c">+0–300 m</span>
+                </div>
                 <SliderRow
                   id="pe-turn-generic"
                   label="Generic 90° turn cost"
@@ -1495,7 +1499,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                   max={300}
                   step={10}
                   formatValue={(v) => `+${v} m`}
-                  tooltip="BRouter turncost (scaled by 1 - cos(angle)): virtual metres added for a 90-degree turn on ordinary roads to favour direct, flowing lines."
+                  tooltip="BRouter turncost (scaled by 1 - cos(angle)): virtual metres added for a 90-degree bend on ordinary roads. Because turncost applies to every geometry vertex, keep this moderate (90–150 m) and use the junction node sliders below to penalize intersections."
                   onChange={(v) => handleAxisChange('turnCostGeneric', v)}
                 />
                 <SliderRow
@@ -1506,7 +1510,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                   max={300}
                   step={10}
                   formatValue={(v) => `+${v} m`}
-                  tooltip="BRouter turncost on designated cycle routes (route=bicycle) and quiet residential streets, often twisted through backstreet filters."
+                  tooltip="BRouter turncost on designated cycle routes (route=bicycle) and safe cycle-lane roads, which often curve around modal filters."
                   onChange={(v) => handleAxisChange('turnCostCycleRoute', v)}
                 />
                 <SliderRow
@@ -1520,16 +1524,70 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                   tooltip="BRouter turncost applied on ways tagged junction=roundabout."
                   onChange={(v) => handleAxisChange('turnCostRoundabout', v)}
                 />
+
+                <div className="pe-subsection-header pe-subsection-divider">
+                  <span>8b. Junction Nodes &amp; Road Transitions</span>
+                  <span className="pe-section-badge pe-badge-c">+0–300 m</span>
+                </div>
                 <SliderRow
                   id="pe-signal-cost"
                   label="Traffic signal wait cost (highway=traffic_signals)"
                   value={axes.trafficSignalCost}
                   min={0}
                   max={300}
+                  step={5}
+                  formatValue={(v) => `+${v} m`}
+                  tooltip="Node initialcost in virtual metres for passing an OSM highway=traffic_signals or crossing=traffic_signals node, even when going straight."
+                  onChange={(v) => handleAxisChange('trafficSignalCost', v)}
+                />
+                <SliderRow
+                  id="pe-stop-giveway-cost"
+                  label="Stop & give-way junction cost (highway=stop|give_way)"
+                  value={axes.stopGiveWayCost}
+                  min={0}
+                  max={300}
+                  step={5}
+                  formatValue={(v) => `+${v} m`}
+                  tooltip="Node initialcost in virtual metres for passing an OSM highway=stop, highway=give_way, or highway=mini_roundabout intersection node."
+                  onChange={(v) => handleAxisChange('stopGiveWayCost', v)}
+                />
+                <SliderRow
+                  id="pe-busy-crossing-cost"
+                  label="Uncontrolled road crossing cost (estimated_crossing_class)"
+                  value={axes.busyCrossingCost}
+                  min={0}
+                  max={300}
                   step={10}
                   formatValue={(v) => `+${v} m`}
-                  tooltip="Node initialcost in virtual metres for passing an OSM highway=traffic_signals or crossing=traffic_signals node."
-                  onChange={(v) => handleAxisChange('trafficSignalCost', v)}
+                  tooltip="Node initialcost at intersection nodes scored by BRouter's precomputed estimated_crossing_class=1..6 (where minor streets or cycleways cross or join busier roads). Scales from 15% at class 1 up to 100% of this slider at class 6."
+                  onChange={(v) => handleAxisChange('busyCrossingCost', v)}
+                />
+                <SliderRow
+                  id="pe-road-transition-cost"
+                  label="Road category switch cost (initialclassifier)"
+                  value={axes.roadTransitionCost}
+                  min={0}
+                  max={300}
+                  step={5}
+                  formatValue={(v) => `+${v} m`}
+                  tooltip="Way initialcost added once whenever the route switches road categories between Main Roads (trunk..unclassified), Local Streets (residential/service), and Cycleways/Paths. Prevents ducking in and out of side streets without penalizing curves along the same road."
+                  onChange={(v) => handleAxisChange('roadTransitionCost', v)}
+                />
+
+                <div className="pe-subsection-header pe-subsection-divider">
+                  <span>8c. One-Ways, Barriers, Steps &amp; Ferries</span>
+                  <span className="pe-section-badge pe-badge-c">+0–300</span>
+                </div>
+                <SliderRow
+                  id="pe-wrong-way-penalty"
+                  label="Wrong-way one-way street penalty (onewaypenalty)"
+                  value={axes.wrongWayPenalty}
+                  min={0}
+                  max={100}
+                  step={5}
+                  formatValue={(v) => `+${v} /m`}
+                  tooltip="Additive per-metre costfactor penalty when routing counter-flow against a one-way street or cycleway without contraflow bike access (oneway:bicycle=no). Higher values (30–50) prevent short wrong-way shortcuts."
+                  onChange={(v) => handleAxisChange('wrongWayPenalty', v)}
                 />
                 <SliderRow
                   id="pe-dismount-cost"

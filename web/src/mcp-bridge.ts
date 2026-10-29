@@ -16,6 +16,7 @@ import {
   type SurfaceCategory,
 } from './utils/classification.ts';
 import { buildProfile, nearestIndex } from './utils/geo.ts';
+import { extractRouteWarnings } from './utils/warnings.ts';
 import { searchPlaces } from './geocoding.ts';
 import type { AvoidArea, LatLon, ProfileName } from './types.ts';
 import type { Basemap } from './basemap.ts';
@@ -63,12 +64,28 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function summarizeRoute(currentRoute: GeoJSON.FeatureCollection | null, slotIdx = 0) {
+function summarizeRoute(
+  currentRoute: GeoJSON.FeatureCollection | null,
+  slotIdx = 0,
+  waypoints?: LatLon[],
+) {
   if (!currentRoute || currentRoute.features.length === 0) return null;
   const feat = currentRoute.features[0];
   const props = (feat.properties || {}) as Record<string, any>;
   const coords = (feat.geometry as GeoJSON.LineString).coordinates;
   const segs: SegmentData[] = props.segments || [];
+  const warnings = extractRouteWarnings(currentRoute, waypoints).map((w) => ({
+    id: w.id,
+    kind: w.kind,
+    label: w.label,
+    detail: w.detail,
+    from: Math.round(w.from),
+    to: Math.round(w.to),
+    distanceM: w.distanceM,
+    lon: Number(w.lon.toFixed(6)),
+    lat: Number(w.lat.toFixed(6)),
+    waypointIndex: w.waypointIndex,
+  }));
 
   const surfaceMeters: Record<string, number> = {};
   const roadMeters: Record<string, number> = {};
@@ -105,6 +122,7 @@ function summarizeRoute(currentRoute: GeoJSON.FeatureCollection | null, slotIdx 
     roadBreakdownMeters: roadMeters,
     trafficBreakdownMeters: trafficMeters,
     noiseBreakdownMeters: noiseMeters,
+    warnings,
     displayedStats: {
       distance: textOf('ri-distance'),
       time: textOf('ri-time'),
@@ -121,11 +139,15 @@ function buildStateSnapshot(ctx: McpBridgeContext) {
   const bounds = map ? map.getBounds() : null;
 
   const hasLayerFeatures = (sourceId: string): number => {
-    if (!map) return 0;
-    const src = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
-    if (!src) return 0;
-    const data = (src as any)._data as GeoJSON.FeatureCollection | undefined;
-    return data && Array.isArray(data.features) ? data.features.length : 0;
+    if (!map || !(map as any).style) return 0;
+    try {
+      const src = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
+      if (!src) return 0;
+      const data = (src as any)._data as GeoJSON.FeatureCollection | undefined;
+      return data && Array.isArray(data.features) ? data.features.length : 0;
+    } catch {
+      return 0;
+    }
   };
 
   return {
@@ -143,7 +165,7 @@ function buildStateSnapshot(ctx: McpBridgeContext) {
       avoidAreas: s.avoidAreas,
       alternativeIdx: s.alternativeIdx,
       isRouting: s.isRouting,
-      routeSummary: summarizeRoute(s.route, idx),
+      routeSummary: summarizeRoute(s.route, idx, s.waypoints),
     })),
     avoidAreas: ctx.routing.avoidAreas,
     status: ctx.routing.status,
@@ -151,7 +173,11 @@ function buildStateSnapshot(ctx: McpBridgeContext) {
     isRouting: ctx.routing.isRouting,
     canUndo: ctx.routing.canUndo,
     canRedo: ctx.routing.canRedo,
-    routeSummary: summarizeRoute(ctx.routing.currentRoute, ctx.routing.activeSlotIdx),
+    routeSummary: summarizeRoute(
+      ctx.routing.currentRoute,
+      ctx.routing.activeSlotIdx,
+      ctx.routing.waypoints,
+    ),
     ui: {
       isControlsCollapsed: ctx.ui.isControlsCollapsed,
       isProfileEditorOpen: ctx.ui.isProfileEditorOpen,
@@ -183,6 +209,7 @@ function buildStateSnapshot(ctx: McpBridgeContext) {
               }
             : null,
           domMarkerCount: document.querySelectorAll('.maplibregl-marker').length,
+          warningMarkerCount: document.querySelectorAll('.warning-map-marker').length,
           routeSourceFeatures: hasLayerFeatures('route'),
           route1SourceFeatures: hasLayerFeatures('route-1'),
           route2SourceFeatures: hasLayerFeatures('route-2'),

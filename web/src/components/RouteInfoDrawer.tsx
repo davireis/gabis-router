@@ -2,11 +2,18 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   getSlotColor,
   PROFILE_INFO,
+  waypointLabel,
+  type LatLon,
   type ProfileMeta,
   type ProfileName,
   type RouteSlotState,
 } from '../types.ts';
 import type { SegmentHighlight, SegmentData } from '../utils/classification.ts';
+import {
+  extractRouteWarnings,
+  WARNING_META,
+  type RouteWarningItem,
+} from '../utils/warnings.ts';
 import {
   formatDistance,
   formatDuration,
@@ -46,6 +53,8 @@ interface RouteInfoDrawerProps {
   hoverPosition?: { lon: number; lat: number } | null;
   onHoverPosition: (pos: { lon: number; lat: number } | null) => void;
   onHighlightSegment: (highlight: SegmentHighlight | null) => void;
+  onFlyTo?: (lon: number, lat: number, minZoom?: number) => void;
+  onRemoveWaypoint?: (index: number) => void;
 }
 
 interface ParsedSlotData {
@@ -57,10 +66,19 @@ interface ParsedSlotData {
   costFactor: number;
   profile: ReturnType<typeof buildProfile>;
   segments: SegmentData[];
+  warnings: RouteWarningItem[];
+}
+
+function formatMarkerDist(meters: number, units: Units): string {
+  if (units === 'imperial') {
+    return `${(meters / 1609.344).toFixed(1)} mi`;
+  }
+  return `${(meters / 1000).toFixed(1)} km`;
 }
 
 function parseRouteFeatureCollection(
   route: GeoJSON.FeatureCollection | null,
+  waypoints?: LatLon[],
 ): ParsedSlotData | null {
   if (!route || route.features.length === 0) return null;
   const feat = route.features[0];
@@ -68,6 +86,7 @@ function parseRouteFeatureCollection(
   const coords = (feat.geometry as GeoJSON.LineString).coordinates;
   const prof = buildProfile(coords);
   const segs: SegmentData[] = props.segments || [];
+  const warnings = extractRouteWarnings(route, waypoints);
 
   const distance = Number(props['track-length'] || 0);
   const cost = Number(props.cost || 0);
@@ -86,6 +105,7 @@ function parseRouteFeatureCollection(
     costFactor,
     profile: prof,
     segments: segs,
+    warnings,
   };
 }
 
@@ -103,12 +123,16 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
   hoverPosition,
   onHoverPosition,
   onHighlightSegment,
+  onFlyTo,
+  onRemoveWaypoint,
 }) => {
   const [collapsedBySlot, setCollapsedBySlot] = useState<Record<number, boolean>>({
     0: isCollapsed,
     1: isCollapsed,
     2: isCollapsed,
   });
+  const [warningsOpenBySlot, setWarningsOpenBySlot] = useState<Record<number, boolean>>({});
+  const [pinnedWarningId, setPinnedWarningId] = useState<string | null>(null);
   const [visibleBars, setVisibleBars] = useState<BreakdownBarId[]>(() => {
     try {
       const raw = localStorage.getItem('rsrouter_breakdown_bars');
@@ -156,7 +180,7 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
   }, [isCollapsed]);
 
   const parsedSlots = useMemo(
-    () => slots.map((slot) => parseRouteFeatureCollection(slot.route)),
+    () => slots.map((slot) => parseRouteFeatureCollection(slot.route, slot.waypoints)),
     [slots],
   );
 
@@ -300,6 +324,28 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
                   e.stopPropagation();
                 }}
               >
+                {routeData && routeData.warnings.length > 0 && (
+                  <button
+                    type="button"
+                    className={`ri-warning-badge ${warningsOpenBySlot[slotIdx] ? 'active' : ''}`}
+                    title={`${routeData.warnings.length} route warning${routeData.warnings.length === 1 ? '' : 's'} along this route — click to toggle warnings list`}
+                    aria-label={`${routeData.warnings.length} route warnings`}
+                    aria-expanded={Boolean(warningsOpenBySlot[slotIdx])}
+                    onClick={() => {
+                      if (hasMultiRoutes && slotRouteIdx !== activeRouteIdx) {
+                        onSelectActiveSlot?.(slotIdx);
+                      }
+                      setWarningsOpenBySlot((prev) => ({
+                        ...prev,
+                        [slotIdx]: !prev[slotIdx],
+                      }));
+                    }}
+                  >
+                    <Icon name="warning" size={12} />
+                    <span>{routeData.warnings.length}</span>
+                  </button>
+                )}
+
                 <div className="ri-alternatives" role="group" aria-label="Route alternatives">
                   {ALTERNATIVES.map((alt) => (
                     <button
@@ -344,6 +390,116 @@ export const RouteInfoDrawer: React.FC<RouteInfoDrawerProps> = ({
                 )}
               </div>
             </div>
+
+            {routeData &&
+              routeData.warnings.length > 0 &&
+              Boolean(warningsOpenBySlot[slotIdx]) && (
+                <div
+                  className="ri-warnings-strip"
+                  role="region"
+                  aria-label="Route warnings"
+                >
+                  <span className="ri-warnings-title">
+                    <Icon name="warning" size={11} />
+                    <span>Warnings</span>
+                    <InfoButton
+                      tooltip="Sections along the route requiring caution (yellow) or where cycling is prohibited / dismount is required (red). Hover a chip to highlight on the map; click to zoom in."
+                      ariaLabel="About Route Warnings"
+                    />
+                  </span>
+                  <div className="ri-warnings-list">
+                    {routeData.warnings.map((w) => {
+                      const meta = WARNING_META[w.kind];
+                      const pinKey = `${slotIdx}:${w.id}`;
+                      const isPinned = pinnedWarningId === pinKey;
+                      const wpCount = slot.waypoints?.length ?? 0;
+                      const wpLbl =
+                        w.waypointIndex !== undefined && wpCount > 0
+                          ? waypointLabel(w.waypointIndex, wpCount)
+                          : undefined;
+                      return (
+                        <div
+                          key={w.id}
+                          className={`ri-warning-chip ${isPinned ? 'active' : ''}`}
+                          style={
+                            {
+                              '--warn-color': w.color,
+                              '--warn-bg': w.badgeBg,
+                            } as React.CSSProperties
+                          }
+                          onPointerEnter={() => {
+                            onHoverPosition({ lon: w.lon, lat: w.lat });
+                            if (w.coordinates.length >= 2) {
+                              onHighlightSegment({
+                                coordinates: [w.coordinates],
+                                color: w.color,
+                              });
+                            }
+                          }}
+                          onPointerLeave={() => {
+                            onHoverPosition(null);
+                            if (!isPinned) {
+                              onHighlightSegment(null);
+                            }
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className="ri-warning-chip-main"
+                            title={`${meta.label} at ${formatMarkerDist(w.from, units)}: ${w.detail} (${formatDistance(w.distanceM)}) — click to locate on map`}
+                            onClick={() => {
+                              if (hasMultiRoutes && slotRouteIdx !== activeRouteIdx) {
+                                onSelectActiveSlot?.(slotIdx);
+                              }
+                              setPinnedWarningId((prev) => {
+                                const next = prev === pinKey ? null : pinKey;
+                                if (next && w.coordinates.length >= 2) {
+                                  onHighlightSegment({
+                                    coordinates: [w.coordinates],
+                                    color: w.color,
+                                  });
+                                } else {
+                                  onHighlightSegment(null);
+                                }
+                                return next;
+                              });
+                              onFlyTo?.(w.lon, w.lat, 15.5);
+                            }}
+                          >
+                            <span
+                              className="ri-warning-dot"
+                              style={{ backgroundColor: w.color }}
+                            />
+                            <span className="ri-warning-km">
+                              {formatMarkerDist(w.from, units)}
+                            </span>
+                            <span className="ri-warning-text">{w.detail}</span>
+                            <span className="ri-warning-len">
+                              ({formatDistance(w.distanceM)})
+                            </span>
+                          </button>
+                          {w.waypointIndex !== undefined && onRemoveWaypoint && (
+                            <button
+                              type="button"
+                              className="ri-warning-fix-btn"
+                              title={`Remove misplaced Waypoint ${wpLbl || w.waypointIndex} to eliminate this U-turn rollback`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (hasMultiRoutes && slotRouteIdx !== activeRouteIdx) {
+                                  onSelectActiveSlot?.(slotIdx);
+                                }
+                                onRemoveWaypoint(w.waypointIndex!);
+                              }}
+                            >
+                              × WP {wpLbl || w.waypointIndex}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
             {routeData && !barCollapsed && (
               <div

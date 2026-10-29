@@ -1,5 +1,5 @@
 #
-# "Gabi's Fast City"
+# "Gabi's Fast Bike"
 # Direct urban cycle routes and bus/cycle lanes, allows urban A-roads, avoids residential zig-zags.
 #
 
@@ -86,6 +86,8 @@ assign is_road =
   or bicycle_road=yes
   cyclestreet=yes
 
+assign isresidentialorliving = or highway=residential|living_street living_street=yes
+
 # OSM surface=* classifications
 assign is_smooth_paved =
   or surface=asphalt or surface=paved or surface=concrete
@@ -138,14 +140,18 @@ assign is_shared_cycleway =
 
 # Turn penalty
 assign turncost = if junction=roundabout then 30
-                  else if and stick_to_cycleroutes is_safe_road then 200
-                  else 250
+                  else if and stick_to_cycleroutes is_safe_road then 90
+                  else 120
 
 assign initialclassifier =
      if route=ferry then 1
-     else 0
+     else if highway=motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified then 2
+     else if or isresidentialorliving highway=service then 3
+     else if highway=cycleway|path|footway|bridleway|track|pedestrian then 4
+     else 2
 
-assign initialcost switch route=ferry 10000 0
+assign initialcost =
+     switch route=ferry 10000 30
 
 assign defaultaccess
        switch access=
@@ -210,10 +216,10 @@ assign onewaypenalty =
          else if ( oneway:bicycle=no                         ) then 0
          else if ( not footaccess                            ) then 100
          else if ( junction=roundabout|circular              ) then 60
-         else if ( highway=trunk|trunk_link|primary|primary_link ) then 50
-         else if ( highway=secondary|secondary_link          ) then 30
-         else if ( highway=tertiary|tertiary_link            ) then 20
-         else 6.0
+         else if ( highway=trunk|trunk_link|primary|primary_link ) then max 50 35
+         else if ( highway=secondary|secondary_link          ) then max 30 35
+         else if ( highway=tertiary|tertiary_link            ) then max 20 35
+         else 35
        )
        else 0.0
 
@@ -235,8 +241,6 @@ assign lanes_penalty =
 
 assign lit_penalty =
   0.0
-
-assign isresidentialorliving = or highway=residential|living_street living_street=yes
 
 # Environment & scenery estimate penalties (estimated_noise_class=1..6, estimated_forest_class=1..6)
 assign noise_penalty =
@@ -368,8 +372,22 @@ assign footaccess
                         0
                         1
 
+assign signal_or_stop_cost =
+    switch or highway=traffic_signals and highway=crossing crossing=traffic_signals 25
+    switch highway=stop|give_way|mini_roundabout 15
+    0
+
+assign crossing_node_cost =
+    multiply 40
+    switch estimated_crossing_class=1 0.15
+    switch estimated_crossing_class=2 0.3
+    switch estimated_crossing_class=3 0.5
+    switch estimated_crossing_class=4 0.7
+    switch estimated_crossing_class=5 0.85
+    switch estimated_crossing_class=6 1.0 0.0
+
 assign initialcost
-    switch or highway=traffic_signals and highway=crossing crossing=traffic_signals 0
+    add max signal_or_stop_cost crossing_node_cost
        switch bikeaccess
               0
               switch footaccess

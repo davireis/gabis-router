@@ -90,12 +90,16 @@ export interface ProfileAxes {
   downhillCost: number; // 0 to 200
   downhillCutoff: number; // 0.0 to 8.0 %
 
-  // 7. Turns, Signals & Barriers (all 0 to 300 m)
+  // 7. Turns, Junctions, Signals & Barriers (all 0 to 300 m)
   enableTurnPenalties: boolean;
   turnCostGeneric: number; // 0 to 300 m
   turnCostCycleRoute: number; // 0 to 300 m
   turnCostRoundabout: number; // 0 to 300 m
   trafficSignalCost: number; // 0 to 300 m
+  stopGiveWayCost: number; // 0 to 300 m (highway=stop|give_way|mini_roundabout)
+  busyCrossingCost: number; // 0 to 300 m (estimated_crossing_class=1..6)
+  roadTransitionCost: number; // 0 to 300 m (initialclassifier + initialcost road category switch)
+  wrongWayPenalty: number; // +0 to +100 per metre (fallback onewaypenalty on counter-flow one-ways)
   dismountNodeCost: number; // 0 to 300 m
   allowSteps: boolean;
   stepsCost: number;
@@ -210,10 +214,14 @@ export const TEMPLATE_PRESETS: Record<
       downhillCutoff: 1.5,
 
       enableTurnPenalties: true,
-      turnCostGeneric: 150,
-      turnCostCycleRoute: 90,
+      turnCostGeneric: 120,
+      turnCostCycleRoute: 60,
       turnCostRoundabout: 30,
       trafficSignalCost: 20,
+      stopGiveWayCost: 15,
+      busyCrossingCost: 60,
+      roadTransitionCost: 20,
+      wrongWayPenalty: 35,
       dismountNodeCost: 300,
       allowSteps: true,
       stepsCost: 119,
@@ -228,8 +236,8 @@ export const TEMPLATE_PRESETS: Record<
     },
   },
   'gabis-fast-city': {
-    name: "Gabi's Fast City",
-    shortLabel: 'Fast City',
+    name: "Gabi's Fast Bike",
+    shortLabel: 'Fast Bike',
     summary: 'Direct urban cycle routes and bus/cycle lanes, allows urban A-roads, avoids residential zig-zags.',
     axes: {
       stickToCycleRoutes: true,
@@ -307,10 +315,14 @@ export const TEMPLATE_PRESETS: Record<
       downhillCutoff: 1.5,
 
       enableTurnPenalties: true,
-      turnCostGeneric: 250,
-      turnCostCycleRoute: 200,
+      turnCostGeneric: 120,
+      turnCostCycleRoute: 90,
       turnCostRoundabout: 30,
-      trafficSignalCost: 0,
+      trafficSignalCost: 25,
+      stopGiveWayCost: 15,
+      busyCrossingCost: 40,
+      roadTransitionCost: 30,
+      wrongWayPenalty: 35,
       dismountNodeCost: 300,
       allowSteps: true,
       stepsCost: 119,
@@ -404,10 +416,14 @@ export const TEMPLATE_PRESETS: Record<
       downhillCutoff: 1.5,
 
       enableTurnPenalties: true,
-      turnCostGeneric: 120,
-      turnCostCycleRoute: 70,
+      turnCostGeneric: 90,
+      turnCostCycleRoute: 50,
       turnCostRoundabout: 0,
       trafficSignalCost: 20,
+      stopGiveWayCost: 10,
+      busyCrossingCost: 50,
+      roadTransitionCost: 15,
+      wrongWayPenalty: 35,
       dismountNodeCost: 300,
       allowSteps: true,
       stepsCost: 119,
@@ -425,9 +441,9 @@ export const TEMPLATE_PRESETS: Record<
 
 export function normalizeProfileAxes(
   raw: Partial<ProfileAxes> | undefined,
-  baseTemplate: BaseTemplateId = 'gabis-safe-road',
+  baseTemplate: BaseTemplateId = 'gabis-fast-city',
 ): ProfileAxes {
-  const defaults = TEMPLATE_PRESETS[baseTemplate]?.axes || TEMPLATE_PRESETS['gabis-safe-road'].axes;
+  const defaults = TEMPLATE_PRESETS[baseTemplate]?.axes || TEMPLATE_PRESETS['gabis-fast-city'].axes;
   if (!raw) return { ...defaults };
   const merged: ProfileAxes = { ...defaults };
   for (const key of Object.keys(defaults) as Array<keyof ProfileAxes>) {
@@ -548,6 +564,8 @@ assign is_road =
   or bicycle_road=yes
   cyclestreet=yes
 
+assign isresidentialorliving = or highway=residential|living_street living_street=yes
+
 # OSM surface=* classifications
 assign is_smooth_paved =
   or surface=asphalt or surface=paved or surface=concrete
@@ -613,9 +631,13 @@ assign turncost = ${
 
 assign initialclassifier =
      if route=ferry then 1
-     else 0
+     else if highway=motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified then 2
+     else if or isresidentialorliving highway=service then 3
+     else if highway=cycleway|path|footway|bridleway|track|pedestrian then 4
+     else 2
 
-assign initialcost switch route=ferry 10000 0
+assign initialcost =
+     switch route=ferry 10000 ${fmtNum(axes.enableTurnPenalties !== false ? axes.roadTransitionCost : 0)}
 
 assign defaultaccess
        switch access=
@@ -680,10 +702,10 @@ assign onewaypenalty =
          else if ( oneway:bicycle=no                         ) then 0
          else if ( not footaccess                            ) then 100
          else if ( junction=roundabout|circular              ) then 60
-         else if ( highway=trunk|trunk_link|primary|primary_link ) then 50
-         else if ( highway=secondary|secondary_link          ) then 30
-         else if ( highway=tertiary|tertiary_link            ) then 20
-         else 6.0
+         else if ( highway=trunk|trunk_link|primary|primary_link ) then max 50 ${fmtNum(axes.wrongWayPenalty)}
+         else if ( highway=secondary|secondary_link          ) then max 30 ${fmtNum(axes.wrongWayPenalty)}
+         else if ( highway=tertiary|tertiary_link            ) then max 20 ${fmtNum(axes.wrongWayPenalty)}
+         else ${fmtNum(axes.wrongWayPenalty)}
        )
        else 0.0
 
@@ -720,8 +742,6 @@ assign lit_penalty =
   else 0.0`
       : '0.0'
   }
-
-assign isresidentialorliving = or highway=residential|living_street living_street=yes
 
 # Environment & scenery estimate penalties (estimated_noise_class=1..6, estimated_forest_class=1..6)
 assign noise_penalty =
@@ -872,8 +892,22 @@ assign footaccess
                         0
                         1
 
-assign initialcost
+assign signal_or_stop_cost =
     switch or highway=traffic_signals and highway=crossing crossing=traffic_signals ${fmtNum(axes.enableTurnPenalties !== false ? axes.trafficSignalCost : 0)}
+    switch highway=stop|give_way|mini_roundabout ${fmtNum(axes.enableTurnPenalties !== false ? axes.stopGiveWayCost : 0)}
+    0
+
+assign crossing_node_cost =
+    multiply ${fmtNum(axes.enableTurnPenalties !== false ? axes.busyCrossingCost : 0)}
+    switch estimated_crossing_class=1 0.15
+    switch estimated_crossing_class=2 0.3
+    switch estimated_crossing_class=3 0.5
+    switch estimated_crossing_class=4 0.7
+    switch estimated_crossing_class=5 0.85
+    switch estimated_crossing_class=6 1.0 0.0
+
+assign initialcost
+    add max signal_or_stop_cost crossing_node_cost
        switch bikeaccess
               0
               switch footaccess
@@ -902,7 +936,7 @@ export function loadSavedCustomProfiles(): CustomProfileRecord[] {
       )
       .map((item: any) => {
         const baseTemplate: BaseTemplateId =
-          item.baseTemplate in TEMPLATE_PRESETS ? item.baseTemplate : 'gabis-safe-road';
+          item.baseTemplate in TEMPLATE_PRESETS ? item.baseTemplate : 'gabis-fast-city';
         const axes = normalizeProfileAxes(item.axes, baseTemplate);
         return {
           ...item,

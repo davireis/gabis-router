@@ -19,17 +19,17 @@ export interface ProfileMeta {
 }
 
 export const PROFILE_INFO: Record<string, ProfileMeta> = {
+  'gabis-fast-city': {
+    id: 'gabis-fast-city',
+    label: "Gabi's Fast Bike",
+    shortLabel: 'Fast Bike',
+    summary: 'Direct urban cycle routes and bus/cycle lanes, avoids residential zig-zags.',
+  },
   'gabis-safe-road': {
     id: 'gabis-safe-road',
     label: "Gabi's Safe Road",
     shortLabel: 'Safe Road',
     summary: 'Protected cycleways and quiet residential streets, avoids fast traffic.',
-  },
-  'gabis-fast-city': {
-    id: 'gabis-fast-city',
-    label: "Gabi's Fast City",
-    shortLabel: 'Fast City',
-    summary: 'Direct urban cycle routes and bus/cycle lanes, avoids residential zig-zags.',
   },
   'gabis-lite-gravel': {
     id: 'gabis-lite-gravel',
@@ -70,8 +70,8 @@ export const PROFILE_INFO: Record<string, ProfileMeta> = {
 };
 
 export const PROFILE_ORDER: BuiltinProfileName[] = [
-  'gabis-safe-road',
   'gabis-fast-city',
+  'gabis-safe-road',
   'gabis-lite-gravel',
   'fastbike-lowtraffic',
   'fastbike-verylowtraffic',

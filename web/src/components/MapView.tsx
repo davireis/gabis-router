@@ -15,6 +15,12 @@ import {
 import type { Basemap } from '../basemap.ts';
 import type { SegmentHighlight } from '../utils/classification.ts';
 import {
+  extractRouteWarnings,
+  WARNING_META,
+  warningKindSvg,
+} from '../utils/warnings.ts';
+import { formatDistance } from '../format.ts';
+import {
   getDemSource,
   getOfflineStyle,
   getOnlineStyle,
@@ -49,14 +55,12 @@ import {
 
 const remotePMTiles = new Map<string, pmtiles.PMTiles>();
 let devCycleCacheBust = Date.now();
-let protocolsRegistered = false;
-
 // Register PMTiles protocols
 function registerProtocols() {
   remotePMTiles.clear();
   devCycleCacheBust = Date.now();
-  if (protocolsRegistered) return;
-  protocolsRegistered = true;
+  if ((window as any).__rsrouterProtocolsRegistered) return;
+  (window as any).__rsrouterProtocolsRegistered = true;
   const protocol = new pmtiles.Protocol();
   maplibregl.addProtocol('pmtiles', protocol.tile);
   getDemSource();
@@ -208,6 +212,7 @@ interface MapViewProps {
   onUpdateAvoidAreaRadius: (index: number, radius: number) => void;
   onRemoveAvoidArea: (index: number) => void;
   onHoverPosition?: (pos: { lat: number; lon: number } | null) => void;
+  onHighlightSegment?: (highlight: SegmentHighlight | null) => void;
   onInspectPoint?: (
     lon: number,
     lat: number,
@@ -239,6 +244,7 @@ export const MapView: React.FC<MapViewProps> = ({
   onUpdateAvoidAreaRadius,
   onRemoveAvoidArea,
   onHoverPosition,
+  onHighlightSegment,
   onInspectPoint,
   onStatusChange,
   onMapInstance,
@@ -247,6 +253,7 @@ export const MapView: React.FC<MapViewProps> = ({
   const mapRef = useRef<maplibregl.Map | null>(null);
   const styleReadyRef = useRef<boolean>(false);
   const markersRef = useRef<maplibregl.Marker[]>([]);
+  const warningMarkersRef = useRef<maplibregl.Marker[]>([]);
   const hoverMarkerRef = useRef<maplibregl.Marker | null>(null);
   const draggingMarkerIndexRef = useRef<number | null>(null);
   const lastOpenedMarkerIndexRef = useRef<number | null>(null);
@@ -282,6 +289,8 @@ export const MapView: React.FC<MapViewProps> = ({
   onRemoveAvoidAreaRef.current = onRemoveAvoidArea;
   const onHoverPositionRef = useRef(onHoverPosition);
   onHoverPositionRef.current = onHoverPosition;
+  const onHighlightSegmentRef = useRef(onHighlightSegment);
+  onHighlightSegmentRef.current = onHighlightSegment;
   const onInspectPointRef = useRef(onInspectPoint);
   onInspectPointRef.current = onInspectPoint;
   const onStatusChangeRef = useRef(onStatusChange);
@@ -656,7 +665,7 @@ export const MapView: React.FC<MapViewProps> = ({
         }
         return;
       }
-      if ((e.originalEvent.target as HTMLElement)?.closest('.wp-marker')) return;
+      if ((e.originalEvent.target as HTMLElement)?.closest('.wp-marker, .warning-map-marker')) return;
       const touch = e.originalEvent.touches[0];
       pressTimer = setTimeout(() => {
         suppressClickUntilRef.current = performance.now() + 500;
@@ -719,7 +728,7 @@ export const MapView: React.FC<MapViewProps> = ({
       const orig = e.originalEvent;
       if ('touches' in orig && orig.touches.length > 1) return;
       if (orig instanceof MouseEvent && orig.button !== 0) return;
-      if ((orig.target as HTMLElement)?.closest('.wp-marker')) return;
+      if ((orig.target as HTMLElement)?.closest('.wp-marker, .warning-map-marker')) return;
       const found = findClosestRoute(e.lngLat.lng, e.lngLat.lat);
       if (!found) return;
       const slotWps = slotsRef.current[found.slotIdx]?.waypoints || waypointsRef.current;
@@ -815,6 +824,8 @@ export const MapView: React.FC<MapViewProps> = ({
       window.removeEventListener('mouseup', finishInsert);
       markersRef.current.forEach((m) => m.remove());
       markersRef.current = [];
+      warningMarkersRef.current.forEach((m) => m.remove());
+      warningMarkersRef.current = [];
       hoverMarkerRef.current?.remove();
       hoverMarkerRef.current = null;
       map.remove();
@@ -1056,6 +1067,147 @@ export const MapView: React.FC<MapViewProps> = ({
       currentMarkers.push(marker);
     });
   }, [waypoints]);
+
+  // Route warning markers along all active routes/profiles
+  useEffect(() => {
+    const map = mapRef.current;
+    warningMarkersRef.current.forEach((m) => m.remove());
+    warningMarkersRef.current = [];
+    if (!map) return;
+
+    // Render non-active slots first and the active slot last so active markers sit on top,
+    // deduplicating identical warnings where compared routes overlap.
+    const orderedSlots = slots
+      .map((slot, slotIdx) => ({ slot, slotIdx }))
+      .filter(({ slot }) => Boolean(slot.route))
+      .sort((a, b) => (a.slotIdx === activeSlotIdx ? 1 : b.slotIdx === activeSlotIdx ? -1 : a.slotIdx - b.slotIdx));
+
+    const seenWarnings: Array<{ kind: string; lon: number; lat: number }> = [];
+
+    orderedSlots.forEach(({ slot, slotIdx }) => {
+      if (!slot.route) return;
+      const slotWps = slot.waypoints || waypoints;
+      const warnings = extractRouteWarnings(slot.route, slotWps);
+
+      warnings.forEach((w) => {
+        const isDuplicate = seenWarnings.some(
+          (s) =>
+            s.kind === w.kind &&
+            Math.abs(s.lon - w.lon) < 0.0004 &&
+            Math.abs(s.lat - w.lat) < 0.0004,
+        );
+        if (isDuplicate) return;
+        seenWarnings.push({ kind: w.kind, lon: w.lon, lat: w.lat });
+
+        const meta = WARNING_META[w.kind];
+        const kmStr = `${(w.from / 1000).toFixed(1)} km`;
+        const el = document.createElement('div');
+        el.className = `warning-map-marker warning-kind-${w.kind} ${w.isProhibition ? 'is-prohibition' : 'is-warning'}`;
+        el.style.setProperty('--warn-color', w.color);
+        el.title = `${meta.label} (${kmStr}): ${w.detail} (${formatDistance(w.distanceM)})`;
+        el.innerHTML = warningKindSvg(w.kind, 12);
+
+        const highlightObj: SegmentHighlight | null =
+          w.coordinates.length >= 2
+            ? { coordinates: [w.coordinates], color: w.color }
+            : null;
+
+        el.addEventListener('pointerenter', () => {
+          if (highlightObj) {
+            onHighlightSegmentRef.current?.(highlightObj);
+          }
+        });
+
+        el.addEventListener('pointerleave', () => {
+          onHighlightSegmentRef.current?.(null);
+        });
+
+        const showWarningContextMenu = (e: MouseEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (slotIdx !== activeSlotIdxRef.current) {
+            onSelectActiveSlotRef.current?.(slotIdx);
+          }
+          if (highlightObj) {
+            onHighlightSegmentRef.current?.(highlightObj);
+          }
+          const rect = el.getBoundingClientRect();
+          const x = e.clientX || rect.left + rect.width / 2;
+          const y = e.clientY || rect.bottom + 4;
+          const currentWps = slotsRef.current[slotIdx]?.waypoints || waypointsRef.current;
+          const wpLbl =
+            w.waypointIndex !== undefined && currentWps.length > 0
+              ? waypointLabel(w.waypointIndex, currentWps.length)
+              : undefined;
+
+          const items: MenuItem[] = [
+            {
+              label: 'Zoom to warning section',
+              onSelect: () => {
+                map.flyTo({
+                  center: [w.lon, w.lat],
+                  zoom: Math.max(map.getZoom(), 16),
+                });
+              },
+            },
+          ];
+
+          if (w.waypointIndex !== undefined) {
+            items.push({
+              label: `Remove point ${wpLbl || w.waypointIndex} (fix rollback)`,
+              danger: true,
+              onSelect: () => onRemoveWaypointRef.current(w.waypointIndex!),
+            });
+          }
+
+          items.push(
+            {
+              label: 'Avoid this section',
+              hint: `${DEFAULT_AVOID_RADIUS_M} m`,
+              dividerBefore: true,
+              onSelect: () =>
+                onAddAvoidAreaRef.current({ lat: w.lat, lon: w.lon }, DEFAULT_AVOID_RADIUS_M),
+            },
+            {
+              label: 'See on Google Street View',
+              dividerBefore: true,
+              onSelect: () =>
+                window.open(
+                  `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${w.lat.toFixed(6)},${w.lon.toFixed(6)}`,
+                  '_blank',
+                  'noopener,noreferrer',
+                ),
+            },
+            {
+              label: 'See on OpenStreetMap',
+              onSelect: () => {
+                const lat = w.lat.toFixed(6);
+                const lon = w.lon.toFixed(6);
+                window.open(
+                  `https://www.openstreetmap.org/query?lat=${lat}&lon=${lon}#map=18/${lat}/${lon}`,
+                  '_blank',
+                  'noopener,noreferrer',
+                );
+              },
+            },
+          );
+
+          showMenu(items, x, y, {
+            title: `${meta.label} · ${kmStr}`,
+            subtitle: `${w.detail} (${formatDistance(w.distanceM)})`,
+          });
+        };
+
+        el.addEventListener('click', showWarningContextMenu);
+        el.addEventListener('contextmenu', showWarningContextMenu);
+
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([w.lon, w.lat])
+          .addTo(map);
+        warningMarkersRef.current.push(marker);
+      });
+    });
+  }, [slots, activeSlotIdx, waypoints]);
 
   // Hover marker
   useEffect(() => {

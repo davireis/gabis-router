@@ -91,6 +91,7 @@ body,
 #controls.editor-open {
   width: clamp(800px, 56vw, 920px);
   max-width: calc(100vw - 32px);
+  height: calc(100vh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
 }
 
 .controls-main-col {
@@ -2304,6 +2305,178 @@ body,
   color: var(--accent);
 }
 
+/* Route Warnings Badge, Strip, Chips, and Map Markers */
+.ri-warning-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.14);
+  color: #d97706;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, transform 0.12s ease;
+}
+
+:root[data-theme="dark"] .ri-warning-badge {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(251, 191, 36, 0.42);
+}
+
+.ri-warning-badge:hover {
+  background: rgba(245, 158, 11, 0.24);
+  border-color: #f59e0b;
+}
+
+.ri-warning-badge.active {
+  background: #f59e0b;
+  border-color: #d97706;
+  color: #ffffff;
+}
+
+.ri-warnings-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border-2);
+  background: rgba(245, 158, 11, 0.05);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.ri-warnings-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #d97706;
+  flex-shrink: 0;
+}
+
+:root[data-theme="dark"] .ri-warnings-title {
+  color: #fbbf24;
+}
+
+.ri-warnings-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ri-warning-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--field);
+  overflow: hidden;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+}
+
+.ri-warning-chip:hover {
+  border-color: var(--warn-color, #f59e0b);
+  background: var(--warn-bg, rgba(245, 158, 11, 0.12));
+}
+
+.ri-warning-chip.active {
+  border-color: var(--warn-color, #f59e0b);
+  background: var(--warn-bg, rgba(245, 158, 11, 0.16));
+  box-shadow: 0 0 0 1px var(--warn-color, #f59e0b);
+}
+
+.ri-warning-chip-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.68rem;
+  line-height: 1.25;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ri-warning-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ri-warning-km {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.ri-warning-text {
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.ri-warning-len {
+  font-size: 0.64rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.ri-warning-fix-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border: none;
+  border-left: 1px solid var(--border-2);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-family: inherit;
+  font-size: 0.64rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s ease;
+}
+
+.ri-warning-fix-btn:hover {
+  background: #fecaca;
+}
+
+.warning-map-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--warn-color, #f59e0b);
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.35);
+  color: #ffffff;
+  cursor: pointer;
+  z-index: 4;
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+
+.warning-map-marker:hover {
+  transform: scale(1.18);
+  z-index: 8;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.45);
+}
+
 .ri-bar-body {
   position: relative;
   padding: 6px 12px 8px;
@@ -3292,9 +3465,11 @@ body,
 .pe-panel {
   flex: 1;
   min-width: 340px;
+  min-height: 0;
+  height: 100%;
+  max-height: calc(100vh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  height: 100%;
   border-left: 1px solid var(--border-2);
   background: var(--surface);
   overflow: hidden;
@@ -3483,9 +3658,11 @@ body,
 }
 
 .pe-body {
-  flex: 1;
+  flex: 1 1 0%;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 10px 12px;
   display: flex;
   flex-direction: column;

@@ -72,12 +72,12 @@ export const App: React.FC = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [routing]);
 
-  const handleFlyTo = useCallback((lon: number, lat: number) => {
+  const handleFlyTo = useCallback((lon: number, lat: number, minZoom = 14) => {
     const map = mapInstanceRef.current;
     if (map) {
       map.flyTo({
         center: [lon, lat],
-        zoom: Math.max(map.getZoom(), 14),
+        zoom: Math.max(map.getZoom(), minZoom),
       });
     }
   }, []);
@@ -177,6 +177,8 @@ export const App: React.FC = () => {
         hoverPosition={hoverPosition}
         onHoverPosition={setHoverPosition}
         onHighlightSegment={setSegmentHighlight}
+        onFlyTo={handleFlyTo}
+        onRemoveWaypoint={routing.removeWaypoint}
       />
 
       <MapView
@@ -201,6 +203,7 @@ export const App: React.FC = () => {
         onRemoveAvoidArea={routing.removeAvoidArea}
         onUpdateAvoidAreaRadius={routing.updateAvoidAreaRadius}
         onHoverPosition={setHoverPosition}
+        onHighlightSegment={setSegmentHighlight}
         onInspectPoint={routing.inspectPoint}
         onStatusChange={routing.setStatus}
         onMapInstance={handleMapInstance}

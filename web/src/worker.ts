@@ -18,6 +18,7 @@ const customProfileContents = new Map<string, string>();
 // Disk-backed Blob handles for 5°×5° .rd5 files (0 bytes of JS heap per file until a slice is read).
 const segmentBlobs = new Map<string, Blob>();
 const failedSegments = new Set<string>();
+const forceMemoryBlobSegments = new Set<string>();
 const fileReaderSync = new FileReaderSync();
 
 function status(message: string) {
@@ -28,45 +29,47 @@ async function fetchWithTimeout(url: string, timeoutMs = 6000): Promise<Response
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { cache: 'no-cache', signal: controller.signal });
+    return await fetch(url, { cache: 'default', signal: controller.signal });
   } finally {
     clearTimeout(timer);
   }
 }
 
 /**
- * Stale-while-revalidate fetch for small text files (lookups and profiles) with timeout protection.
+ * Fetch small local text files (lookups and profiles) with offline CacheStorage fallback.
  */
 async function fetchText(url: string): Promise<string> {
   const cache = await caches.open(SEGMENT_CACHE_NAME);
-  const cached = await cache.match(url);
-  if (cached && !isHtml(cached)) {
-    if (!isOfflineMode && navigator.onLine) {
-      fetchWithTimeout(url, 4000)
-        .then((res) => {
-          if (res.ok && !isHtml(res)) {
-            cache.put(url, res).catch(() => {});
-          }
-        })
-        .catch(() => {});
+  if (isOfflineMode) {
+    const cached = await cache.match(url);
+    if (cached && !isHtml(cached)) {
+      return cached.text();
     }
-    return cached.text();
   }
 
-  const res = await fetchWithTimeout(url, 8000);
-  if (!res.ok || isHtml(res)) {
-    throw new Error(`Failed to fetch ${url}: HTTP ${res.status}`);
+  try {
+    const res = await fetchWithTimeout(url, 8000);
+    if (res.ok && !isHtml(res)) {
+      const text = await res.text();
+      cache
+        .put(
+          url,
+          new Response(text, {
+            headers: { 'content-type': 'text/plain; charset=utf-8' },
+          }),
+        )
+        .catch(() => {});
+      return text;
+    }
+  } catch {
+    // Fall back to CacheStorage below
   }
-  const text = await res.text();
-  cache
-    .put(
-      url,
-      new Response(text, {
-        headers: { 'content-type': 'text/plain; charset=utf-8' },
-      }),
-    )
-    .catch(() => {});
-  return text;
+
+  const cached = await cache.match(url);
+  if (cached && !isHtml(cached)) {
+    return cached.text();
+  }
+  throw new Error(`Failed to fetch ${url}`);
 }
 
 function segmentName(lon: number, lat: number): string {
@@ -77,14 +80,23 @@ function segmentName(lon: number, lat: number): string {
   return `${slon}_${slat}`;
 }
 
-async function toReadableBlob(res: Response, fallbackBytes?: Uint8Array): Promise<Blob | null> {
-  try {
-    const blob = await res.blob();
-    if (blob.size < MIN_RD5_BYTES) return null;
-    fileReaderSync.readAsArrayBuffer(blob.slice(0, 8));
-    return blob;
-  } catch {
-    if (!fallbackBytes) return null;
+async function toReadableBlob(
+  res: Response,
+  fallbackBytes?: Uint8Array,
+  forceMemory = false,
+): Promise<Blob | null> {
+  const clone = fallbackBytes ? null : res.clone();
+  if (!forceMemory) {
+    try {
+      const blob = await res.blob();
+      if (blob.size < MIN_RD5_BYTES) return null;
+      fileReaderSync.readAsArrayBuffer(blob.slice(0, 8));
+      return blob;
+    } catch {
+      // Fall back to in-memory Blob below if disk-backed Blob handle is unreadable via FileReaderSync
+    }
+  }
+  if (fallbackBytes) {
     try {
       const memBlob = new Blob([fallbackBytes as BlobPart]);
       if (memBlob.size < MIN_RD5_BYTES) return null;
@@ -94,13 +106,30 @@ async function toReadableBlob(res: Response, fallbackBytes?: Uint8Array): Promis
       return null;
     }
   }
+  if (clone) {
+    try {
+      const ab = await clone.arrayBuffer();
+      if (ab.byteLength < MIN_RD5_BYTES) return null;
+      const memBlob = new Blob([ab]);
+      fileReaderSync.readAsArrayBuffer(memBlob.slice(0, 8));
+      return memBlob;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 /**
  * Opens a zero-copy disk-backed Blob reference to `/segments4/<segmentName>.rd5` in CacheStorage,
- * downloading and caching it first if not yet present.
+ * downloading and caching it once if not yet present. Cached segments are never deleted unless
+ * corrupt (< MIN_RD5_BYTES or HTML) or manually cleared by the user.
  */
-async function openSegmentBlob(name: string, required: boolean): Promise<boolean> {
+async function openSegmentBlob(
+  name: string,
+  required: boolean,
+  onlyIfCached = false,
+): Promise<boolean> {
   const existing = segmentBlobs.get(name);
   if (existing) {
     try {
@@ -108,6 +137,7 @@ async function openSegmentBlob(name: string, required: boolean): Promise<boolean
       return true;
     } catch {
       segmentBlobs.delete(name);
+      forceMemoryBlobSegments.add(name);
     }
   }
   if (!required && failedSegments.has(name)) {
@@ -117,14 +147,31 @@ async function openSegmentBlob(name: string, required: boolean): Promise<boolean
   const key = `/segments4/${name}.rd5`;
   const cache = await caches.open(SEGMENT_CACHE_NAME);
   const cached = await cache.match(key);
-  if (cached && !isHtml(cached)) {
-    const blob = await toReadableBlob(cached);
-    if (blob) {
-      segmentBlobs.set(name, blob);
-      failedSegments.delete(name);
-      return true;
+  if (cached) {
+    if (isHtml(cached)) {
+      await cache.delete(key);
+    } else {
+      const headerLen = Number(cached.headers.get('content-length')) || 0;
+      if (headerLen > 0 && headerLen < MIN_RD5_BYTES) {
+        await cache.delete(key);
+      } else {
+        const blob = await toReadableBlob(cached, undefined, forceMemoryBlobSegments.has(name));
+        if (blob) {
+          segmentBlobs.set(name, blob);
+          failedSegments.delete(name);
+          return true;
+        }
+        // Do not delete valid cached segments on transient read errors; return without re-downloading.
+        if (required) {
+          throw new Error(`Cached routing segment ${name} is temporarily busy. Please retry.`);
+        }
+        return false;
+      }
     }
-    await cache.delete(key);
+  }
+
+  if (onlyIfCached) {
+    return false;
   }
 
   if (isOfflineMode) {
@@ -144,8 +191,9 @@ async function openSegmentBlob(name: string, required: boolean): Promise<boolean
     });
     const freshCached = await cache.match(key);
     const blob =
-      (freshCached ? await toReadableBlob(freshCached, bytes) : null) ??
-      new Blob([bytes as BlobPart]);
+      (freshCached
+        ? await toReadableBlob(freshCached, bytes, forceMemoryBlobSegments.has(name))
+        : null) ?? new Blob([bytes as BlobPart]);
     segmentBlobs.set(name, blob);
     failedSegments.delete(name);
     return true;
@@ -182,6 +230,7 @@ async function ensureRouter(): Promise<WasmRouter> {
         return new Uint8Array(buf);
       } catch (err) {
         segmentBlobs.delete(name);
+        forceMemoryBlobSegments.add(name);
         throw err;
       }
     },
@@ -253,7 +302,7 @@ async function runWithLazySegments<T>(
     }
   }
   for (const seg of nearbySegments) {
-    await openSegmentBlob(seg, false);
+    await openSegmentBlob(seg, false, true);
   }
 
   r.take_missing_segments();
@@ -435,7 +484,7 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
       if (msg.id !== latestInspectId) return;
       try {
         const seg = segmentName(msg.lon, msg.lat);
-        const hasSeg = await openSegmentBlob(seg, false);
+        const hasSeg = await openSegmentBlob(seg, false, true);
         if (!hasSeg || msg.id !== latestInspectId) {
           postMessage({
             type: 'INSPECT_POINT_SUCCESS',
@@ -471,6 +520,7 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
       }
       segmentBlobs.clear();
       failedSegments.clear();
+      forceMemoryBlobSegments.clear();
       break;
     }
   }

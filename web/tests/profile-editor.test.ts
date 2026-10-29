@@ -91,6 +91,10 @@ test('generateBrfFromAxes supports 10000 disallow values, surface subclasses, un
   base.trafficClass7Penalty = 2.7;
   base.noiseClass5Penalty = 0.7;
   base.noForestPenalty = 1.5;
+  base.stopGiveWayCost = 25;
+  base.busyCrossingCost = 70;
+  base.roadTransitionCost = 45;
+  base.wrongWayPenalty = 40;
 
   const brf = generateBrfFromAxes(base, { name: 'Disallow Test' });
   assert.ok(brf.includes('min 10000'));
@@ -100,6 +104,10 @@ test('generateBrfFromAxes supports 10000 disallow values, surface subclasses, un
   assert.ok(brf.includes('add trafficpenalty'));
   assert.ok(brf.includes('add lanes_penalty'));
   assert.ok(brf.includes('add lit_penalty'));
+  assert.ok(brf.includes('switch route=ferry 10000 45'));
+  assert.ok(brf.includes('switch highway=stop|give_way|mini_roundabout 25'));
+  assert.ok(brf.includes('multiply 70\n    switch estimated_crossing_class=1 0.15'));
+  assert.ok(brf.includes('else 40\n       )\n       else 0.0'));
   assert.ok(brf.includes('switch is_shared_cycleway 10000 0.3'));
   assert.ok(brf.includes('switch    highway=path                              10000'));
   assert.ok(brf.includes('else if is_unpaved_ground then 10000'));

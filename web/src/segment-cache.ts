@@ -132,8 +132,18 @@ export async function getCachedSegmentDate(cache: Cache, segmentId: string): Pro
  */
 export async function getCachedSegmentSize(cache: Cache, segmentId: string): Promise<number> {
   const match = await cache.match(`/segments4/${segmentId}.rd5`);
-  return Number(match?.headers.get('content-length')) || 0;
+  if (!match || isHtml(match)) return 0;
+  const headerLen = Number(match.headers.get('content-length')) || 0;
+  if (headerLen > 0) return headerLen;
+  try {
+    const blob = await match.blob();
+    return blob.size;
+  } catch {
+    return 0;
+  }
 }
+
+const inFlightSegmentDownloads = new Map<string, Promise<Uint8Array>>();
 
 /**
  * Checks if browser storage has enough space for new download.
@@ -149,96 +159,132 @@ export async function ensureStorageFor(bytes: number, what: string) {
 }
 
 /**
- * Downloads a segment from the BRouter repository (/segments4/<id>.rd5), caches it, and returns the byte array.
+ * Downloads a segment from the BRouter repository (/segments4/<id>.rd5) once, caches it, and returns the byte array.
+ * If a valid segment already exists in CacheStorage, returns the cached bytes without re-downloading.
  */
 export async function fetchAndCacheSegment(
   segmentId: string,
   onProgress?: (received: number, total: number) => void,
 ): Promise<Uint8Array> {
-  const cache = await caches.open(SEGMENT_CACHE_NAME);
-  const key = `/segments4/${segmentId}.rd5`;
-  const downloadUrl = getSegmentDownloadUrl(segmentId);
+  const existingInFlight = inFlightSegmentDownloads.get(segmentId);
+  if (existingInFlight) {
+    return existingInFlight;
+  }
 
-  const controller = new AbortController();
-  let stallTimer: ReturnType<typeof setTimeout> | null = setTimeout(
-    () => controller.abort(),
-    20000,
-  );
-  const resetStallTimer = () => {
-    if (stallTimer) clearTimeout(stallTimer);
-    stallTimer = setTimeout(() => controller.abort(), 20000);
-  };
+  const run = async (): Promise<Uint8Array> => {
+    const cache = await caches.open(SEGMENT_CACHE_NAME);
+    const key = `/segments4/${segmentId}.rd5`;
 
-  let received = 0;
-  let total = 0;
-  let lastMod: string | null = null;
-  const chunks: Uint8Array[] = [];
-
-  try {
-    const res = await fetch(downloadUrl, { cache: 'no-cache', signal: controller.signal });
-    resetStallTimer();
-    if (!res.ok || !res.body || isHtml(res)) {
-      throw new Error(`Failed to fetch routing segment ${segmentId}: HTTP ${res.status}`);
-    }
-
-    lastMod = res.headers.get('last-modified');
-    total = Number(res.headers.get('content-length')) || 0;
-    if (total) {
-      if (total < MIN_RD5_BYTES) {
-        throw new Error(`Routing segment ${segmentId} is too small (${total} bytes)`);
-      }
-      await ensureStorageFor(total, `${segmentId}.rd5`);
-      resetStallTimer();
-    }
-
-    const reader = res.body.getReader();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      resetStallTimer();
-      if (done) break;
-      chunks.push(value);
-      received += value.byteLength;
-      if (onProgress) {
-        onProgress(received, total);
+    const existing = await cache.match(key);
+    if (existing && !isHtml(existing)) {
+      try {
+        const ab = await existing.arrayBuffer();
+        if (ab.byteLength >= MIN_RD5_BYTES) {
+          return new Uint8Array(ab);
+        }
+      } catch {
+        // Proceed to download if cached body could not be read
       }
     }
-  } finally {
-    if (stallTimer) clearTimeout(stallTimer);
-  }
 
-  if (total ? received !== total : received < MIN_RD5_BYTES) {
-    throw new Error(`Incomplete download of ${segmentId}.rd5: ${received} of ${total || '?'} bytes`);
-  }
+    const downloadUrl = getSegmentDownloadUrl(segmentId);
 
-  const bytes = new Uint8Array(received);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
+    const controller = new AbortController();
+    let stallTimer: ReturnType<typeof setTimeout> | null = setTimeout(
+      () => controller.abort(),
+      20000,
+    );
+    const resetStallTimer = () => {
+      if (stallTimer) clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => controller.abort(), 20000);
+    };
 
-  let creationDate = getRd5CreationDate(bytes.buffer);
-  if (!creationDate) {
-    if (lastMod) {
-      const parsed = new Date(lastMod);
-      if (!isNaN(parsed.getTime())) creationDate = parsed;
+    let received = 0;
+    let total = 0;
+    let lastMod: string | null = null;
+    const chunks: Uint8Array[] = [];
+
+    try {
+      const res = await fetch(downloadUrl, { cache: 'default', signal: controller.signal });
+      resetStallTimer();
+      if (!res.ok || !res.body || isHtml(res)) {
+        throw new Error(`Failed to fetch routing segment ${segmentId}: HTTP ${res.status}`);
+      }
+
+      lastMod = res.headers.get('last-modified');
+      total = Number(res.headers.get('content-length')) || 0;
+      if (total) {
+        if (total < MIN_RD5_BYTES) {
+          throw new Error(`Routing segment ${segmentId} is too small (${total} bytes)`);
+        }
+        await ensureStorageFor(total, `${segmentId}.rd5`);
+        resetStallTimer();
+      }
+
+      const reader = res.body.getReader();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        resetStallTimer();
+        if (done) break;
+        chunks.push(value);
+        received += value.byteLength;
+        if (onProgress) {
+          onProgress(received, total);
+        }
+      }
+    } finally {
+      if (stallTimer) clearTimeout(stallTimer);
     }
-  }
-  if (!creationDate) {
-    creationDate = new Date();
-  }
 
-  segmentDateMemo.set(segmentId, creationDate);
-  const headers: Record<string, string> = {
-    'content-type': 'application/octet-stream',
-    'content-length': String(received),
-    'x-segment-date': creationDate.toISOString(),
+    if (total ? received !== total : received < MIN_RD5_BYTES) {
+      throw new Error(`Incomplete download of ${segmentId}.rd5: ${received} of ${total || '?'} bytes`);
+    }
+
+    const bytes = new Uint8Array(received);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+
+    let creationDate = getRd5CreationDate(bytes.buffer);
+    if (!creationDate) {
+      if (lastMod) {
+        const parsed = new Date(lastMod);
+        if (!isNaN(parsed.getTime())) creationDate = parsed;
+      }
+    }
+    if (!creationDate) {
+      creationDate = new Date();
+    }
+
+    segmentDateMemo.set(segmentId, creationDate);
+    const headers: Record<string, string> = {
+      'content-type': 'application/octet-stream',
+      'content-length': String(received),
+      'x-segment-date': creationDate.toISOString(),
+    };
+
+    await cache.put(key, new Response(bytes, { headers }));
+    notifyCacheUpdated();
+    return bytes;
   };
 
-  await cache.put(key, new Response(bytes, { headers }));
-  notifyCacheUpdated();
-  return bytes;
+  const runLocked = async (): Promise<Uint8Array> => {
+    if (typeof navigator !== 'undefined' && navigator.locks?.request) {
+      return (await navigator.locks.request(`rsrouter-rd5-${segmentId}`, () =>
+        run(),
+      )) as unknown as Uint8Array;
+    }
+    return run();
+  };
+
+  const promise = runLocked().finally(() => {
+    inFlightSegmentDownloads.delete(segmentId);
+  });
+  inFlightSegmentDownloads.set(segmentId, promise);
+  return promise;
 }
 
 /**
