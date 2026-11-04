@@ -54,14 +54,22 @@ test('generateBrfFromAxes reflects OSM highway and surface slider changes', () =
   assert.ok(brf.includes('and highway=trunk|trunk_link'));
 });
 
-test('normalizeProfileAxes fills missing fields from template defaults', () => {
-  const partial = { primaryCost: 1.4, cyclewaySharedCost: 15, cobblestonePenalty: 0.5 };
+test('normalizeProfileAxes fills missing fields from template defaults and migrates legacy busyCrossingCost', () => {
+  const partial = {
+    primaryCost: 1.4,
+    cyclewaySharedCost: 15,
+    cobblestonePenalty: 0.5,
+    busyCrossingCost: 100,
+  } as any;
   const norm = normalizeProfileAxes(partial, 'gabis-safe-road');
   assert.equal(norm.primaryCost, 1.4);
   assert.equal(norm.cyclewaySharedCost, 15);
   assert.equal(norm.tertiaryCost, 0.0);
   assert.equal(norm.gravelPenalty, 5.0);
   assert.equal(norm.cobblestonePenalty, 0.5);
+  assert.equal(norm.crossingClass1Cost, 15);
+  assert.equal(norm.crossingClass3Cost, 50);
+  assert.equal(norm.crossingClass6Cost, 100);
 });
 
 test('generateBrfFromAxes supports 10000 disallow values, surface subclasses, uncertain/untagged penalties, and additive costfactor starting from 1.0', () => {
@@ -92,7 +100,11 @@ test('generateBrfFromAxes supports 10000 disallow values, surface subclasses, un
   base.noiseClass5Penalty = 0.7;
   base.noForestPenalty = 1.5;
   base.stopGiveWayCost = 25;
-  base.busyCrossingCost = 70;
+  base.crossingClass3Cost = 55;
+  base.crossingClass5Cost = 10000;
+  base.crossingClass6Cost = 170;
+  base.turnAcrossTrafficClass4Cost = 95;
+  base.turnAcrossTrafficClass6Cost = 180;
   base.roadTransitionCost = 45;
   base.wrongWayPenalty = 40;
 
@@ -106,7 +118,12 @@ test('generateBrfFromAxes supports 10000 disallow values, surface subclasses, un
   assert.ok(brf.includes('add lit_penalty'));
   assert.ok(brf.includes('switch route=ferry 10000 45'));
   assert.ok(brf.includes('switch highway=stop|give_way|mini_roundabout 25'));
-  assert.ok(brf.includes('multiply 70\n    switch estimated_crossing_class=1 0.15'));
+  assert.ok(brf.includes('switch way:coming_from_lowprio'));
+  assert.ok(brf.includes('switch estimated_crossing_class=3 55'));
+  assert.ok(brf.includes('switch estimated_crossing_class=5 1000000'));
+  assert.ok(brf.includes('switch estimated_crossing_class=6 170 0'));
+  assert.ok(brf.includes('assign cost_ToRight_from_H_class4   = 95'));
+  assert.ok(brf.includes('assign cost_ToRight_from_H_class6   = 180'));
   assert.ok(brf.includes('else 40\n       )\n       else 0.0'));
   assert.ok(brf.includes('switch is_shared_cycleway 10000 0.3'));
   assert.ok(brf.includes('switch    highway=path                              10000'));

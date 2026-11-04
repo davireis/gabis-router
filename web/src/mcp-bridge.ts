@@ -195,6 +195,42 @@ function buildStateSnapshot(ctx: McpBridgeContext) {
         height: simulatedViewport?.height || window.innerHeight,
         simulated: Boolean(simulatedViewport),
       },
+      profileEditor: ctx.ui.isProfileEditorOpen
+        ? {
+            source: (document.getElementById('pe-source-select') as HTMLSelectElement | null)?.value,
+            name: (document.getElementById('pe-name-input') as HTMLInputElement | null)?.value,
+            dslTextarea: (document.getElementById('pe-dsl-textarea') as HTMLTextAreaElement | null)
+              ?.value,
+            sliders: Array.from(document.querySelectorAll('.pe-slider-row')).map((row) => {
+              const range = row.querySelector('.pe-range-input') as HTMLInputElement | null;
+              const disallow = row.querySelector(
+                '.pe-disallow-check input',
+              ) as HTMLInputElement | null;
+              const valSpan = row.querySelector('.pe-slider-val');
+              return {
+                id: range?.id || '',
+                value: disallow?.checked ? 10000 : Number(range?.value ?? 0),
+                display: valSpan?.textContent?.trim() || '',
+                disallowed: Boolean(disallow?.checked),
+              };
+            }),
+            toggles: Array.from(
+              document.querySelectorAll(
+                '.pe-toggle-row input[type="checkbox"], .pe-section-toggle input[type="checkbox"]',
+              ),
+            ).map((el) => {
+              const inp = el as HTMLInputElement;
+              return { id: inp.id, checked: inp.checked };
+            }),
+          }
+        : null,
+      customProfiles: ctx.routing.customProfiles.map((c) => ({
+        id: c.id,
+        name: c.name,
+        baseTemplate: c.baseTemplate,
+        mode: c.mode,
+        axes: c.axes,
+      })),
     },
     map: map
       ? {

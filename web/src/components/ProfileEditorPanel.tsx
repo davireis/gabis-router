@@ -717,6 +717,18 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 tooltip="Additive penalty (+0.0 = no penalty) for OSM highway=service: access roads to estates, parks, industrial sites, parking aisles, or alleys."
                 onChange={(v) => handleAxisChange('serviceCost', v)}
               />
+              <SliderRow
+                id="pe-road-tunnel-cost"
+                label="Road Tunnel (tunnel=yes on motor roads)"
+                value={axes.roadTunnelPenalty}
+                min={0.0}
+                max={20.0}
+                step={0.1}
+                formatValue={(v) => `+${Number(v.toFixed(1))}`}
+                disallowable
+                tooltip="Additive penalty (+0.0 = no penalty) for motor roads inside tunnels (tunnel=yes on highway=trunk, primary, secondary, tertiary, unclassified, residential, service)."
+                onChange={(v) => handleAxisChange('roadTunnelPenalty', v)}
+              />
 
               <div className="pe-subsection-header pe-subsection-divider">
                 <span>2d. Paths (cycleway, path, footway, bridleway, pedestrian)</span>
@@ -1552,17 +1564,6 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                   onChange={(v) => handleAxisChange('stopGiveWayCost', v)}
                 />
                 <SliderRow
-                  id="pe-busy-crossing-cost"
-                  label="Uncontrolled road crossing cost (estimated_crossing_class)"
-                  value={axes.busyCrossingCost}
-                  min={0}
-                  max={300}
-                  step={10}
-                  formatValue={(v) => `+${v} m`}
-                  tooltip="Node initialcost at intersection nodes scored by BRouter's precomputed estimated_crossing_class=1..6 (where minor streets or cycleways cross or join busier roads). Scales from 15% at class 1 up to 100% of this slider at class 6."
-                  onChange={(v) => handleAxisChange('busyCrossingCost', v)}
-                />
-                <SliderRow
                   id="pe-road-transition-cost"
                   label="Road category switch cost (initialclassifier)"
                   value={axes.roadTransitionCost}
@@ -1570,12 +1571,160 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                   max={300}
                   step={5}
                   formatValue={(v) => `+${v} m`}
-                  tooltip="Way initialcost added once whenever the route switches road categories between Main Roads (trunk..unclassified), Local Streets (residential/service), and Cycleways/Paths. Prevents ducking in and out of side streets without penalizing curves along the same road."
+                  tooltip="Way initialcost added once whenever the route switches road categories between A-roads (trunk/primary), B-roads (secondary), C-roads (tertiary), Local Streets (unclassified/residential/service), and Cycleways/Paths. Penalizes both minor-to-major and major-to-major road switches without any turn angle penalty."
                   onChange={(v) => handleAxisChange('roadTransitionCost', v)}
                 />
 
                 <div className="pe-subsection-header pe-subsection-divider">
-                  <span>8c. One-Ways, Barriers, Steps &amp; Ferries</span>
+                  <span>8c. Uncontrolled Road Crossings (estimated_crossing_class=1..6)</span>
+                  <span className="pe-section-badge pe-badge-c">+0–1000 m</span>
+                </div>
+                <SliderRow
+                  id="pe-crossing-1"
+                  label="Class 1: Very low risk (traffic class 1-2 or refuge island)"
+                  value={axes.crossingClass1Cost}
+                  min={0}
+                  max={1000}
+                  step={10}
+                  disallowable
+                  formatValue={(v) => `+${v} m`}
+                  tooltip="Node initialcost when entering or crossing a Class 1 junction from a minor road or cycleway/path (way:coming_from_lowprio). Applies regardless of turn angle."
+                  onChange={(v) => handleAxisChange('crossingClass1Cost', v)}
+                />
+                <SliderRow
+                  id="pe-crossing-2"
+                  label="Class 2: Low risk (traffic class 2-3)"
+                  value={axes.crossingClass2Cost}
+                  min={0}
+                  max={1000}
+                  step={10}
+                  disallowable
+                  formatValue={(v) => `+${v} m`}
+                  tooltip="Node initialcost when entering or crossing a Class 2 junction from a minor road or cycleway/path (way:coming_from_lowprio)."
+                  onChange={(v) => handleAxisChange('crossingClass2Cost', v)}
+                />
+                <SliderRow
+                  id="pe-crossing-3"
+                  label="Class 3: Moderate risk (traffic class 3-4)"
+                  value={axes.crossingClass3Cost}
+                  min={0}
+                  max={1000}
+                  step={10}
+                  disallowable
+                  formatValue={(v) => `+${v} m`}
+                  tooltip="Node initialcost when entering or crossing a Class 3 junction from a minor road or cycleway/path (way:coming_from_lowprio)."
+                  onChange={(v) => handleAxisChange('crossingClass3Cost', v)}
+                />
+                <SliderRow
+                  id="pe-crossing-4"
+                  label="Class 4: High risk (traffic class 4-5)"
+                  value={axes.crossingClass4Cost}
+                  min={0}
+                  max={1000}
+                  step={10}
+                  disallowable
+                  formatValue={(v) => `+${v} m`}
+                  tooltip="Node initialcost when entering or crossing a Class 4 junction from a minor road or cycleway/path (way:coming_from_lowprio)."
+                  onChange={(v) => handleAxisChange('crossingClass4Cost', v)}
+                />
+                <SliderRow
+                  id="pe-crossing-5"
+                  label="Class 5: Very high risk (traffic class 5-6)"
+                  value={axes.crossingClass5Cost}
+                  min={0}
+                  max={1000}
+                  step={10}
+                  disallowable
+                  formatValue={(v) => `+${v} m`}
+                  tooltip="Node initialcost when entering or crossing a Class 5 junction from a minor road or cycleway/path (way:coming_from_lowprio)."
+                  onChange={(v) => handleAxisChange('crossingClass5Cost', v)}
+                />
+                <SliderRow
+                  id="pe-crossing-6"
+                  label="Class 6: Extreme risk (traffic class 6, fast or multi-lane)"
+                  value={axes.crossingClass6Cost}
+                  min={0}
+                  max={1000}
+                  step={10}
+                  disallowable
+                  formatValue={(v) => `+${v} m`}
+                  tooltip="Node initialcost when entering or crossing a Class 6 junction from a minor road or cycleway/path (way:coming_from_lowprio)."
+                  onChange={(v) => handleAxisChange('crossingClass6Cost', v)}
+                />
+
+                <div className="pe-subsection-header pe-subsection-divider">
+                  <span>8d. Turns Across Oncoming Traffic (cost_ToRight_from_H)</span>
+                  <span className="pe-section-badge pe-badge-c">+0–400 m</span>
+                </div>
+                <SliderRow
+                  id="pe-turn-across-1"
+                  label="Class 1: Very low risk right turn"
+                  value={axes.turnAcrossTrafficClass1Cost}
+                  min={0}
+                  max={400}
+                  step={5}
+                  formatValue={(v) => `+${v} m`}
+                  tooltip="BRouter cost_ToRight_from_H_class1: extra virtual metres when turning right (across oncoming UK left-hand traffic) from a major road (tertiary..primary, prio >= 21) onto a minor street or path (prio <= 20) at a Class 1 junction."
+                  onChange={(v) => handleAxisChange('turnAcrossTrafficClass1Cost', v)}
+                />
+                <SliderRow
+                  id="pe-turn-across-2"
+                  label="Class 2: Low risk right turn"
+                  value={axes.turnAcrossTrafficClass2Cost}
+                  min={0}
+                  max={400}
+                  step={5}
+                  formatValue={(v) => `+${v} m`}
+                  tooltip="BRouter cost_ToRight_from_H_class2: extra virtual metres when turning right across oncoming traffic from a major road onto a minor road at a Class 2 junction."
+                  onChange={(v) => handleAxisChange('turnAcrossTrafficClass2Cost', v)}
+                />
+                <SliderRow
+                  id="pe-turn-across-3"
+                  label="Class 3: Moderate risk right turn"
+                  value={axes.turnAcrossTrafficClass3Cost}
+                  min={0}
+                  max={400}
+                  step={5}
+                  formatValue={(v) => `+${v} m`}
+                  tooltip="BRouter cost_ToRight_from_H_class3: extra virtual metres when turning right across oncoming traffic from a major road onto a minor road at a Class 3 junction."
+                  onChange={(v) => handleAxisChange('turnAcrossTrafficClass3Cost', v)}
+                />
+                <SliderRow
+                  id="pe-turn-across-4"
+                  label="Class 4: High risk right turn"
+                  value={axes.turnAcrossTrafficClass4Cost}
+                  min={0}
+                  max={400}
+                  step={5}
+                  formatValue={(v) => `+${v} m`}
+                  tooltip="BRouter cost_ToRight_from_H_class4: extra virtual metres when turning right across oncoming traffic from a major road onto a minor road at a Class 4 junction."
+                  onChange={(v) => handleAxisChange('turnAcrossTrafficClass4Cost', v)}
+                />
+                <SliderRow
+                  id="pe-turn-across-5"
+                  label="Class 5: Very high risk right turn"
+                  value={axes.turnAcrossTrafficClass5Cost}
+                  min={0}
+                  max={400}
+                  step={5}
+                  formatValue={(v) => `+${v} m`}
+                  tooltip="BRouter cost_ToRight_from_H_class5: extra virtual metres when turning right across oncoming traffic from a major road onto a minor road at a Class 5 junction."
+                  onChange={(v) => handleAxisChange('turnAcrossTrafficClass5Cost', v)}
+                />
+                <SliderRow
+                  id="pe-turn-across-6"
+                  label="Class 6: Extreme risk right turn"
+                  value={axes.turnAcrossTrafficClass6Cost}
+                  min={0}
+                  max={400}
+                  step={10}
+                  formatValue={(v) => `+${v} m`}
+                  tooltip="BRouter cost_ToRight_from_H_class6: extra virtual metres when turning right across oncoming traffic from a major road onto a minor road at a Class 6 junction."
+                  onChange={(v) => handleAxisChange('turnAcrossTrafficClass6Cost', v)}
+                />
+
+                <div className="pe-subsection-header pe-subsection-divider">
+                  <span>8e. One-Ways, Barriers, Steps &amp; Ferries</span>
                   <span className="pe-section-badge pe-badge-c">+0–300</span>
                 </div>
                 <SliderRow

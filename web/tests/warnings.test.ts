@@ -135,6 +135,48 @@ test('extractRouteWarnings detects steps and node barriers', () => {
   assert.ok(warnings[1].detail.includes('stile'));
 });
 
+test('extractRouteWarnings detects dangerous junctions on Class 5 and 6 uncontrolled crossings from minor roads', () => {
+  const route = makeStraightRoute([
+    makeMsgRow(150, 'highway=bridleway', 'estimated_crossing_class=6'), // Class 6 from bridleway -> warning
+    makeMsgRow(18, 'highway=residential', 'estimated_crossing_class=6'), // dual carriageway 2nd lane -> merges with above
+    makeMsgRow(200, 'highway=primary', 'estimated_crossing_class=6'), // major road riding through -> ignored
+    makeMsgRow(150, 'highway=residential', 'estimated_crossing_class=5 highway=traffic_signals'), // signalised -> ignored
+    makeMsgRow(150, 'highway=unclassified', 'estimated_crossing_class=5'), // Class 5 from unclassified -> warning
+    makeMsgRow(150, 'highway=unclassified', 'estimated_crossing_class=4'), // Class 4 -> ignored
+  ]);
+
+  const warnings = extractRouteWarnings(route);
+  assert.deepEqual(
+    warnings.map((w) => w.kind),
+    ['dangerous_junction', 'dangerous_junction'],
+  );
+  assert.ok(warnings[0].detail.includes('Class 6'));
+  assert.ok(warnings[1].detail.includes('Class 5'));
+});
+
+test('extractRouteWarnings detects motor road tunnels and ignores short underpasses or separated cycle tracks', () => {
+  const route = makeStraightRoute([
+    makeMsgRow(25, 'highway=tertiary tunnel=yes'), // < 50m railway bridge underpass -> ignored
+    makeMsgRow(200, 'highway=residential'),
+    makeMsgRow(120, 'highway=secondary tunnel=yes'), // >= 50m motor road tunnel -> warning
+    makeMsgRow(200, 'highway=primary tunnel=yes cycleway=track'), // separated cycle track -> ignored
+    makeMsgRow(1483, 'highway=primary tunnel=yes bicycle=unknown cycleway=no'), // Rotherhithe Tunnel -> prohibition warning
+  ]);
+
+  const warnings = extractRouteWarnings(route);
+  assert.deepEqual(
+    warnings.map((w) => w.kind),
+    ['road_tunnel', 'road_tunnel'],
+  );
+  assert.equal(warnings[0].distanceM, 120);
+  assert.equal(warnings[0].isProhibition, false);
+  assert.equal(warnings[0].color, WARNING_COLOR_YELLOW);
+  assert.equal(warnings[1].distanceM, 1483);
+  assert.equal(warnings[1].isProhibition, true);
+  assert.equal(warnings[1].color, PROHIBITION_COLOR_RED);
+  assert.ok(warnings[1].detail.includes('discouraged'));
+});
+
 test('extractRouteWarnings detects short out-and-back U-turn rollbacks and matches nearby via waypoints', () => {
   const coords: number[][] = [
     [0.0, 51.0, 10],

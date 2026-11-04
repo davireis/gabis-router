@@ -4,6 +4,8 @@ import { buildProfile, haversine, nearestIndex, type Profile } from './geo.ts';
 export type RouteWarningKind =
   | 'dismount'
   | 'dangerous_road'
+  | 'dangerous_junction'
+  | 'road_tunnel'
   | 'rollback'
   | 'ferry_ford'
   | 'steps_barrier';
@@ -36,6 +38,20 @@ export const WARNING_META: Record<RouteWarningKind, RouteWarningMeta> = {
     badgeBg: WARNING_BG_YELLOW,
     description: 'Motorways, non-urban trunk A-roads, or high-speed roads with heavy traffic and no cycleway.',
   },
+  dangerous_junction: {
+    label: 'Dangerous / Busy Road Crossing',
+    shortLabel: 'Dangerous Junction',
+    color: WARNING_COLOR_YELLOW,
+    badgeBg: WARNING_BG_YELLOW,
+    description: 'Uncontrolled crossings or entries onto fast or heavy-traffic roads from a minor street, cycleway, or path.',
+  },
+  road_tunnel: {
+    label: 'Road Tunnel',
+    shortLabel: 'Road Tunnel',
+    color: WARNING_COLOR_YELLOW,
+    badgeBg: WARNING_BG_YELLOW,
+    description: 'Motor road tunnels without separated cycle infrastructure.',
+  },
   rollback: {
     label: 'Short Rollback / U-Turn',
     shortLabel: 'Rollback',
@@ -62,6 +78,8 @@ export const WARNING_META: Record<RouteWarningKind, RouteWarningMeta> = {
 export const WARNING_KIND_ORDER: RouteWarningKind[] = [
   'rollback',
   'dangerous_road',
+  'dangerous_junction',
+  'road_tunnel',
   'dismount',
   'steps_barrier',
   'ferry_ford',
@@ -405,6 +423,38 @@ function detectRollbacks(profile: Profile, waypoints?: LatLon[]): RouteWarningIt
   return results;
 }
 
+const LOW_PRIO_HIGHWAYS = new Set([
+  'residential',
+  'living_street',
+  'unclassified',
+  'service',
+  'cycleway',
+  'path',
+  'footway',
+  'bridleway',
+  'track',
+  'pedestrian',
+  'steps',
+  'road',
+]);
+
+const MOTOR_ROAD_HIGHWAYS = new Set([
+  'motorway',
+  'motorway_link',
+  'trunk',
+  'trunk_link',
+  'primary',
+  'primary_link',
+  'secondary',
+  'secondary_link',
+  'tertiary',
+  'tertiary_link',
+  'unclassified',
+  'residential',
+  'living_street',
+  'service',
+]);
+
 interface RawTagWarning {
   kind: RouteWarningKind;
   detail: string;
@@ -491,6 +541,28 @@ export function extractRouteWarnings(
       });
     }
 
+    // Check uncontrolled high-risk road crossings (estimated_crossing_class >= 5) from a minor road or path
+    const crossingClass = Number(node.get('estimated_crossing_class') || 0);
+    const isLowPrioWay = LOW_PRIO_HIGHWAYS.has(hw) || way.get('living_street') === 'yes';
+    if (
+      crossingClass >= 5 &&
+      isLowPrioWay &&
+      node.get('highway') !== 'traffic_signals' &&
+      node.get('crossing') !== 'traffic_signals'
+    ) {
+      const jFrom = Math.max(0, toM - Math.min(segLen, 10));
+      rawWarnings.push({
+        kind: 'dangerous_junction',
+        detail:
+          crossingClass >= 6
+            ? 'Uncontrolled high-speed road crossing (Class 6)'
+            : 'Uncontrolled busy road crossing (Class 5)',
+        from: jFrom,
+        to: Math.max(jFrom + 5, toM),
+        isProhibition: false,
+      });
+    }
+
     if (segLen <= 0) continue;
 
     // A. Ferry / Ford
@@ -527,7 +599,23 @@ export function extractRouteWarnings(
       continue;
     }
 
-    // C. Dangerous / High-Speed Roads
+    // C. Road Tunnels & High-Speed Roads
+    if (way.get('tunnel') === 'yes' && MOTOR_ROAD_HIGHWAYS.has(hw) && !hasSeparatedCycleTrack(way)) {
+      rawWarnings.push({
+        kind: 'road_tunnel',
+        detail:
+          bike === 'unknown'
+            ? 'Road tunnel (cycling discouraged / no cycleway)'
+            : 'Motor road tunnel without cycleway',
+        from: fromM,
+        to: toM,
+        isProhibition: bike === 'unknown',
+      });
+      if (segLen >= 50 || bike === 'unknown') {
+        continue;
+      }
+    }
+
     if (hw === 'motorway' || hw === 'motorway_link' || way.get('motorroad') === 'yes') {
       rawWarnings.push({
         kind: 'dangerous_road',
@@ -663,6 +751,10 @@ export function extractRouteWarnings(
     if (w.kind === 'dangerous_road' && !w.isProhibition && len < 100) {
       continue;
     }
+    // Skip short (< 50 m) bridge underpasses on motor roads unless cycling is discouraged
+    if (w.kind === 'road_tunnel' && !w.isProhibition && len < 50) {
+      continue;
+    }
     const midDist = (w.from + w.to) * 0.5;
     const midPt = pointAtDistance(profile, midDist);
     items.push({
@@ -700,6 +792,10 @@ export function warningKindSvg(kind: RouteWarningKind, size = 12): string {
       return `<svg ${attrs}><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`;
     case 'dangerous_road':
       return `<svg ${attrs}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+    case 'dangerous_junction':
+      return `<svg ${attrs}><path d="M12 3v18"/><path d="M3 12h18"/><path d="M8 7l4-4 4 4"/><path d="M17 8l4 4-4 4"/></svg>`;
+    case 'road_tunnel':
+      return `<svg ${attrs}><path d="M4 20V11a8 8 0 0 1 16 0v9"/><line x1="2" y1="20" x2="22" y2="20"/><line x1="12" y1="12" x2="12" y2="16"/></svg>`;
     case 'dismount':
       return `<svg ${attrs}><circle cx="12" cy="12" r="9"/><line x1="5.7" y1="5.7" x2="18.3" y2="18.3"/></svg>`;
     case 'steps_barrier':

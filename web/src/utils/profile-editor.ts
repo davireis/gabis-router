@@ -17,6 +17,7 @@ export interface ProfileAxes {
   unclassifiedCost: number; // highway=unclassified
   residentialCost: number; // highway=residential|living_street
   serviceCost: number; // highway=service
+  roadTunnelPenalty: number; // tunnel=yes on motor roads (is_road)
 
   // 2b. OSM Cycleway, Path & Track Classes (highway=* non-motor ways, all +0.0 to +20.0)
   cyclewayCost: number; // highway=cycleway (segregated / dedicated)
@@ -97,8 +98,19 @@ export interface ProfileAxes {
   turnCostRoundabout: number; // 0 to 300 m
   trafficSignalCost: number; // 0 to 300 m
   stopGiveWayCost: number; // 0 to 300 m (highway=stop|give_way|mini_roundabout)
-  busyCrossingCost: number; // 0 to 300 m (estimated_crossing_class=1..6)
-  roadTransitionCost: number; // 0 to 300 m (initialclassifier + initialcost road category switch)
+  roadTransitionCost: number; // 0 to 300 m (initialclassifier + initialcost road tier switch)
+  crossingClass1Cost: number; // 0 to 500 m (estimated_crossing_class=1 when coming_from_lowprio)
+  crossingClass2Cost: number; // 0 to 500 m (estimated_crossing_class=2)
+  crossingClass3Cost: number; // 0 to 500 m (estimated_crossing_class=3)
+  crossingClass4Cost: number; // 0 to 500 m (estimated_crossing_class=4)
+  crossingClass5Cost: number; // 0 to 500 m (estimated_crossing_class=5)
+  crossingClass6Cost: number; // 0 to 500 m (estimated_crossing_class=6)
+  turnAcrossTrafficClass1Cost: number; // 0 to 500 m (cost_ToRight_from_H_class1)
+  turnAcrossTrafficClass2Cost: number; // 0 to 500 m (cost_ToRight_from_H_class2)
+  turnAcrossTrafficClass3Cost: number; // 0 to 500 m (cost_ToRight_from_H_class3)
+  turnAcrossTrafficClass4Cost: number; // 0 to 500 m (cost_ToRight_from_H_class4)
+  turnAcrossTrafficClass5Cost: number; // 0 to 500 m (cost_ToRight_from_H_class5)
+  turnAcrossTrafficClass6Cost: number; // 0 to 500 m (cost_ToRight_from_H_class6)
   wrongWayPenalty: number; // +0 to +100 per metre (fallback onewaypenalty on counter-flow one-ways)
   dismountNodeCost: number; // 0 to 300 m
   allowSteps: boolean;
@@ -153,6 +165,7 @@ export const TEMPLATE_PRESETS: Record<
       unclassifiedCost: 0.1,
       residentialCost: 0.2,
       serviceCost: 0.2,
+      roadTunnelPenalty: 5.0,
 
       cyclewayCost: 0.3,
       cyclewaySharedCost: 0.5,
@@ -182,7 +195,7 @@ export const TEMPLATE_PRESETS: Record<
       mudSandPenalty: 9.0,
       woodMetalPenalty: 9.0,
       untaggedRoadSurfacePenalty: 0.0,
-      untaggedPathSurfacePenalty: 0.0,
+      untaggedPathSurfacePenalty: 5.0,
 
       enableTrafficPenalties: true,
       trafficClass1Penalty: 0.0,
@@ -219,8 +232,19 @@ export const TEMPLATE_PRESETS: Record<
       turnCostRoundabout: 30,
       trafficSignalCost: 20,
       stopGiveWayCost: 15,
-      busyCrossingCost: 60,
       roadTransitionCost: 20,
+      crossingClass1Cost: 15,
+      crossingClass2Cost: 30,
+      crossingClass3Cost: 60,
+      crossingClass4Cost: 90,
+      crossingClass5Cost: 130,
+      crossingClass6Cost: 10000,
+      turnAcrossTrafficClass1Cost: 15,
+      turnAcrossTrafficClass2Cost: 35,
+      turnAcrossTrafficClass3Cost: 65,
+      turnAcrossTrafficClass4Cost: 100,
+      turnAcrossTrafficClass5Cost: 150,
+      turnAcrossTrafficClass6Cost: 200,
       wrongWayPenalty: 35,
       dismountNodeCost: 300,
       allowSteps: true,
@@ -242,30 +266,31 @@ export const TEMPLATE_PRESETS: Record<
     axes: {
       stickToCycleRoutes: true,
       nonCycleRouteRoadPenalty: 0.2,
-      useProposedCycleRoutes: true,
-      allowBusLanes: true,
+      useProposedCycleRoutes: false,
+      allowBusLanes: false,
       allowUrbanTrunks: true,
       allowMotorways: false,
 
       trunkCost: 10.0,
-      primaryCost: 0.0,
-      secondaryCost: 0.0,
+      primaryCost: 0.1,
+      secondaryCost: 0.1,
       tertiaryCost: 0.0,
-      unclassifiedCost: 0.0,
+      unclassifiedCost: 0.2,
       residentialCost: 0.1,
-      serviceCost: 0.0,
+      serviceCost: 0.1,
+      roadTunnelPenalty: 5.0,
 
-      cyclewayCost: 0.0,
+      cyclewayCost: 0.1,
       cyclewaySharedCost: 0.3,
-      pathCost: 5.0,
-      footwayCost: 5.0,
-      bridlewayCost: 0.3,
-      pedestrianCost: 5.0,
-      trackGrade1Cost: 1.0,
-      trackGrade2Cost: 2.0,
-      trackGrade3Cost: 5.0,
-      trackGrade4Cost: 5.0,
-      trackUntaggedCost: 5.0,
+      pathCost: 15.0,
+      footwayCost: 15.0,
+      bridlewayCost: 0.5,
+      pedestrianCost: 15.0,
+      trackGrade1Cost: 10.0,
+      trackGrade2Cost: 11.0,
+      trackGrade3Cost: 12.0,
+      trackGrade4Cost: 13.0,
+      trackUntaggedCost: 15.0,
 
       enableSurfacePenalties: true,
       asphaltPenalty: 0.0,
@@ -283,7 +308,7 @@ export const TEMPLATE_PRESETS: Record<
       mudSandPenalty: 5.0,
       woodMetalPenalty: 5.0,
       untaggedRoadSurfacePenalty: 0.3,
-      untaggedPathSurfacePenalty: 0.3,
+      untaggedPathSurfacePenalty: 5.0,
 
       enableTrafficPenalties: true,
       trafficClass1Penalty: 0.0,
@@ -315,13 +340,24 @@ export const TEMPLATE_PRESETS: Record<
       downhillCutoff: 1.5,
 
       enableTurnPenalties: true,
-      turnCostGeneric: 120,
-      turnCostCycleRoute: 90,
-      turnCostRoundabout: 30,
-      trafficSignalCost: 25,
-      stopGiveWayCost: 15,
-      busyCrossingCost: 40,
+      turnCostGeneric: 200,
+      turnCostCycleRoute: 150,
+      turnCostRoundabout: 90,
+      trafficSignalCost: 20,
+      stopGiveWayCost: 180,
       roadTransitionCost: 30,
+      crossingClass1Cost: 0,
+      crossingClass2Cost: 0,
+      crossingClass3Cost: 0,
+      crossingClass4Cost: 100,
+      crossingClass5Cost: 140,
+      crossingClass6Cost: 10000,
+      turnAcrossTrafficClass1Cost: 0,
+      turnAcrossTrafficClass2Cost: 0,
+      turnAcrossTrafficClass3Cost: 0,
+      turnAcrossTrafficClass4Cost: 0,
+      turnAcrossTrafficClass5Cost: 0,
+      turnAcrossTrafficClass6Cost: 200,
       wrongWayPenalty: 35,
       dismountNodeCost: 300,
       allowSteps: true,
@@ -355,6 +391,7 @@ export const TEMPLATE_PRESETS: Record<
       unclassifiedCost: 0.1,
       residentialCost: 0.2,
       serviceCost: 0.2,
+      roadTunnelPenalty: 5.0,
 
       cyclewayCost: 0.3,
       cyclewaySharedCost: 0.3,
@@ -384,7 +421,7 @@ export const TEMPLATE_PRESETS: Record<
       mudSandPenalty: 2.5,
       woodMetalPenalty: 2.5,
       untaggedRoadSurfacePenalty: 0.0,
-      untaggedPathSurfacePenalty: 0.0,
+      untaggedPathSurfacePenalty: 5.0,
 
       enableTrafficPenalties: true,
       trafficClass1Penalty: 0.0,
@@ -421,8 +458,19 @@ export const TEMPLATE_PRESETS: Record<
       turnCostRoundabout: 0,
       trafficSignalCost: 20,
       stopGiveWayCost: 10,
-      busyCrossingCost: 50,
       roadTransitionCost: 15,
+      crossingClass1Cost: 15,
+      crossingClass2Cost: 30,
+      crossingClass3Cost: 50,
+      crossingClass4Cost: 80,
+      crossingClass5Cost: 110,
+      crossingClass6Cost: 10000,
+      turnAcrossTrafficClass1Cost: 15,
+      turnAcrossTrafficClass2Cost: 30,
+      turnAcrossTrafficClass3Cost: 50,
+      turnAcrossTrafficClass4Cost: 80,
+      turnAcrossTrafficClass5Cost: 120,
+      turnAcrossTrafficClass6Cost: 160,
       wrongWayPenalty: 35,
       dismountNodeCost: 300,
       allowSteps: true,
@@ -446,6 +494,15 @@ export function normalizeProfileAxes(
   const defaults = TEMPLATE_PRESETS[baseTemplate]?.axes || TEMPLATE_PRESETS['gabis-fast-city'].axes;
   if (!raw) return { ...defaults };
   const merged: ProfileAxes = { ...defaults };
+  const legacyBusyCrossing = (raw as any).busyCrossingCost;
+  if (typeof legacyBusyCrossing === 'number' && raw.crossingClass6Cost === undefined) {
+    merged.crossingClass1Cost = Math.round(legacyBusyCrossing * 0.15);
+    merged.crossingClass2Cost = Math.round(legacyBusyCrossing * 0.3);
+    merged.crossingClass3Cost = Math.round(legacyBusyCrossing * 0.5);
+    merged.crossingClass4Cost = Math.round(legacyBusyCrossing * 0.7);
+    merged.crossingClass5Cost = Math.round(legacyBusyCrossing * 0.85);
+    merged.crossingClass6Cost = Math.round(legacyBusyCrossing);
+  }
   for (const key of Object.keys(defaults) as Array<keyof ProfileAxes>) {
     const val = raw[key];
     if (typeof val === typeof defaults[key]) {
@@ -459,6 +516,11 @@ function fmtNum(n: number): string {
   const safe = Number.isFinite(n) ? n : 0;
   if (Number.isInteger(safe)) return String(safe);
   return Number(safe.toFixed(3)).toString();
+}
+
+function fmtNodeCost(n: number): string {
+  if (n >= 9999) return '1000000';
+  return fmtNum(n);
 }
 
 /**
@@ -512,6 +574,17 @@ assign considerTurnRestrictions     = true
 assign correctMisplacedViaPoints    = false
 assign correctMisplacedViaPointsDistance = 400
 assign processUnusedTags            = false
+
+# Crossing & oncoming-turn parameters (UK left-hand traffic: right turn crosses oncoming lane)
+assign consider_crossing            = ${axes.enableTurnPenalties !== false}
+assign crossing_Prio_H              = 21
+assign crossing_Prio_L              = 20
+assign cost_ToRight_from_H_class1   = ${fmtNum(axes.enableTurnPenalties !== false ? axes.turnAcrossTrafficClass1Cost : 0)}
+assign cost_ToRight_from_H_class2   = ${fmtNum(axes.enableTurnPenalties !== false ? axes.turnAcrossTrafficClass2Cost : 0)}
+assign cost_ToRight_from_H_class3   = ${fmtNum(axes.enableTurnPenalties !== false ? axes.turnAcrossTrafficClass3Cost : 0)}
+assign cost_ToRight_from_H_class4   = ${fmtNum(axes.enableTurnPenalties !== false ? axes.turnAcrossTrafficClass4Cost : 0)}
+assign cost_ToRight_from_H_class5   = ${fmtNum(axes.enableTurnPenalties !== false ? axes.turnAcrossTrafficClass5Cost : 0)}
+assign cost_ToRight_from_H_class6   = ${fmtNum(axes.enableTurnPenalties !== false ? axes.turnAcrossTrafficClass6Cost : 0)}
 
 
 ---context:way   # following code refers to way-tags
@@ -631,13 +704,18 @@ assign turncost = ${
 
 assign initialclassifier =
      if route=ferry then 1
-     else if highway=motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified then 2
-     else if or isresidentialorliving highway=service then 3
-     else if highway=cycleway|path|footway|bridleway|track|pedestrian then 4
-     else 2
+     else if highway=motorway|motorway_link|trunk|trunk_link|primary|primary_link then 2
+     else if highway=secondary|secondary_link then 3
+     else if highway=tertiary|tertiary_link then 4
+     else if or isresidentialorliving highway=unclassified|service then 5
+     else if highway=cycleway|path|footway|bridleway|track|pedestrian then 6
+     else 5
 
 assign initialcost =
      switch route=ferry 10000 ${fmtNum(axes.enableTurnPenalties !== false ? axes.roadTransitionCost : 0)}
+
+assign coming_from_lowprio =
+     or isresidentialorliving highway=unclassified|service|cycleway|path|footway|bridleway|track|pedestrian|steps
 
 assign defaultaccess
        switch access=
@@ -776,6 +854,10 @@ assign non_cycleroute_road_penalty =
   if and stick_to_cycleroutes and is_road not is_safe_road then ${fmtNum(axes.nonCycleRouteRoadPenalty)}
   else 0.0
 
+assign tunnel_penalty =
+  if and tunnel=yes is_road then ${fmtNum(axes.roadTunnelPenalty)}
+  else 0.0
+
 assign costfactor
   switch and highway= not route=ferry  10000
   switch or highway=proposed highway=abandoned 10000
@@ -790,6 +872,7 @@ assign costfactor
   add noise_penalty
   add non_cycleroute_road_penalty
   add surface_penalty
+  add tunnel_penalty
 
   switch or highway=motorway highway=motorway_link    switch allow_motorways 0.5 10000
   switch or highway=trunk highway=trunk_link
@@ -898,13 +981,18 @@ assign signal_or_stop_cost =
     0
 
 assign crossing_node_cost =
-    multiply ${fmtNum(axes.enableTurnPenalties !== false ? axes.busyCrossingCost : 0)}
-    switch estimated_crossing_class=1 0.15
-    switch estimated_crossing_class=2 0.3
-    switch estimated_crossing_class=3 0.5
-    switch estimated_crossing_class=4 0.7
-    switch estimated_crossing_class=5 0.85
-    switch estimated_crossing_class=6 1.0 0.0
+    ${
+      axes.enableTurnPenalties !== false
+        ? `switch way:coming_from_lowprio
+      switch estimated_crossing_class=1 ${fmtNodeCost(axes.crossingClass1Cost)}
+      switch estimated_crossing_class=2 ${fmtNodeCost(axes.crossingClass2Cost)}
+      switch estimated_crossing_class=3 ${fmtNodeCost(axes.crossingClass3Cost)}
+      switch estimated_crossing_class=4 ${fmtNodeCost(axes.crossingClass4Cost)}
+      switch estimated_crossing_class=5 ${fmtNodeCost(axes.crossingClass5Cost)}
+      switch estimated_crossing_class=6 ${fmtNodeCost(axes.crossingClass6Cost)} 0
+    0`
+        : '0'
+    }
 
 assign initialcost
     add max signal_or_stop_cost crossing_node_cost

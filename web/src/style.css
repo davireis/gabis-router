@@ -1119,6 +1119,12 @@ body,
   border-width: 2px;
   font-size: 0.82rem;
   cursor: grab;
+  z-index: 10;
+}
+
+.wp-marker:hover,
+.wp-marker:active {
+  z-index: 12;
 }
 
 .wp-badge.start,
@@ -2467,13 +2473,13 @@ body,
   box-shadow: 0 2px 5px rgba(15, 23, 42, 0.35);
   color: #ffffff;
   cursor: pointer;
-  z-index: 4;
+  z-index: 2;
   transition: transform 0.14s ease, box-shadow 0.14s ease;
 }
 
 .warning-map-marker:hover {
   transform: scale(1.18);
-  z-index: 8;
+  z-index: 4;
   box-shadow: 0 3px 8px rgba(15, 23, 42, 0.45);
 }
 
