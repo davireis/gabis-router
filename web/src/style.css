@@ -2047,6 +2047,16 @@ body,
   cursor: not-allowed;
 }
 
+.settings-release-info {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 5px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  padding-top: 2px;
+}
+
 /* Route Info Stacked Bottom Bars */
 .route-section-footer {
   margin-top: auto;

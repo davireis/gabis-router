@@ -5,6 +5,9 @@ import type { OfflineBundleStatus, DownloadProgress } from '../hooks/useOffline.
 import { InfoButton } from './TooltipPopover.tsx';
 import { Icon } from './common/Icon.tsx';
 
+declare const __BUILD_TIME__: string | undefined;
+declare const __BUILD_SHA__: string | undefined;
+
 interface SettingsSectionProps {
   isOpen: boolean;
   onClose: () => void;
@@ -60,6 +63,19 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   };
 
   const mb = Math.round(bundleStatus.totalBytes / (1024 * 1024));
+  const rawBuildTime = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : '';
+  const buildSha = typeof __BUILD_SHA__ !== 'undefined' ? __BUILD_SHA__ : '';
+  const parsedBuildDate = rawBuildTime ? new Date(rawBuildTime) : null;
+  const formattedBuildTime =
+    parsedBuildDate && !Number.isNaN(parsedBuildDate.getTime())
+      ? parsedBuildDate.toLocaleString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : rawBuildTime;
 
   return (
     <div
@@ -239,6 +255,16 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
               </div>
             </div>
           </div>
+
+          {formattedBuildTime && (
+            <div id="settings-release-info" className="settings-release-info" title={rawBuildTime}>
+              <span>Release:</span>
+              <span className="offline-meta-val">
+                {formattedBuildTime}
+                {buildSha ? ` (${buildSha})` : ''}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

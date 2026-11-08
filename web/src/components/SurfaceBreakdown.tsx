@@ -35,7 +35,7 @@ export type BreakdownBarId = 'surface' | 'road' | 'area' | 'traffic' | 'noise' |
 export const BREAKDOWN_BAR_OPTIONS: Array<{ id: BreakdownBarId; label: string; title: string }> = [
   { id: 'surface', label: 'Surface', title: 'Toggle Surface breakdown bar' },
   { id: 'road', label: 'Road', title: 'Toggle Road Type breakdown bar' },
-  { id: 'area', label: 'Area', title: 'Toggle Urban / Countryside breakdown bar' },
+  { id: 'area', label: 'Area', title: 'Toggle Urban / Countryside / Park breakdown bar' },
   { id: 'traffic', label: 'Traffic', title: 'Toggle Traffic breakdown bar' },
   { id: 'noise', label: 'Noise', title: 'Toggle Noise breakdown bar' },
   { id: 'speed', label: 'Limit', title: 'Toggle Speed Limit breakdown bar' },
@@ -445,7 +445,7 @@ export const SurfaceBreakdown: React.FC<SurfaceBreakdownProps> = ({
         <StackedBarRow
           rowKey="area"
           title="Area"
-          tooltip="Urban vs Countryside from BRouter estimated_town_class=1..6, OpenStreetMap lit=*, sidewalk=*, and residential streets: Countryside (unlit non-residential without sidewalks and town class 0) vs Urban (town class 1–6, lit=yes, sidewalk present, or residential). Click any class chip to expand its subclasses."
+          tooltip="Urban vs Countryside / Park from BRouter estimated_town_class=1..6, OpenStreetMap lit=*, sidewalk=*, and residential streets: Countryside / Park (unlit non-residential without sidewalks and town class 0) vs Urban (town class 1–6, lit=yes, sidewalk present, or residential). Click any class chip to expand its subclasses."
           ariaLabel="Urban and countryside areas"
           totalDist={total}
           segments={segments}

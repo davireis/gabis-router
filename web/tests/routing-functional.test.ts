@@ -156,6 +156,7 @@ const isSharpTurn = (s: RouteStep) => s.turnCost >= 25;
 const isFootway = (s: RouteStep) =>
   s.fromM >= 100 &&
   s.tags.highway === 'footway' &&
+  s.tags.footway !== 'crossing' &&
   s.tags.bicycle !== 'yes' &&
   s.tags.bicycle !== 'designated';
 

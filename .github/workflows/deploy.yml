@@ -33,7 +33,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install wasm-bindgen-cli
-        run: cargo install wasm-bindgen-cli
+        run: |
+          WASM_BINDGEN_VERSION=$(cargo pkgid wasm-bindgen | cut -d@ -f2)
+          cargo install -f wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

@@ -211,7 +211,7 @@ export function classifyRoadGroup(highway?: string): RoadGroupCategory {
 export type AreaCategory = 'countryside' | 'urban';
 
 export const AREA_META: Record<AreaCategory, { label: string; color: string }> = {
-  countryside: { label: 'Countryside', color: '#10b981' },
+  countryside: { label: 'Countryside / Park', color: '#10b981' },
   urban: { label: 'Urban', color: '#f97316' },
 };
 

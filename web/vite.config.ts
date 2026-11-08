@@ -2,8 +2,19 @@ import { defineConfig, type Connect } from 'vite';
 import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
-import { spawn } from 'child_process';
+import { execSync, spawn } from 'child_process';
 import { createHash } from 'crypto';
+
+let buildTimeIso = new Date().toISOString();
+let buildSha = 'dev';
+try {
+  const gitInfo = execSync('git log -1 --format="%cI|%h"', { encoding: 'utf8' }).trim();
+  const [iso, sha] = gitInfo.split('|');
+  if (iso) buildTimeIso = iso;
+  if (sha) buildSha = sha;
+} catch {
+  // Fallback to current timestamp if git metadata is unavailable
+}
 
 const certDir = path.join(__dirname, '.cert');
 const keyPath = path.join(certDir, 'key.pem');
@@ -136,6 +147,10 @@ const serveMapTiles: Connect.NextHandleFunction = async (req, res, next) => {
 };
 
 export default defineConfig({
+  define: {
+    __BUILD_TIME__: JSON.stringify(buildTimeIso),
+    __BUILD_SHA__: JSON.stringify(buildSha),
+  },
   server: {
     host: '0.0.0.0',
     port: 3000,
