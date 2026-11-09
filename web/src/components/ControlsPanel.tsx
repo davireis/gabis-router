@@ -149,8 +149,11 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
     if (!routing.currentRoute) return;
     const startName = routing.waypoints[0]?.name;
     const endName = routing.waypoints[routing.waypoints.length - 1]?.name;
+    const profileTag = routing.profile.startsWith('custom:')
+      ? routing.getProfileMeta(routing.profile).shortLabel
+      : routing.profile;
     const trackName =
-      startName && endName ? `${startName} to ${endName}` : `${routing.profile}_route`;
+      startName && endName ? `${startName} to ${endName}` : `${profileTag}_route`;
     const filename = `${trackName.replace(/[/\\?%*:|"<>]/g, '_')}.gpx`;
     await downloadGpxFile(routeToGpx(routing.currentRoute, trackName), filename);
     routing.setStatus(`Route exported as ${filename}`);
@@ -351,14 +354,14 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
                       title={slotMeta.summary}
                       onChange={(e) => routing.setSlotProfile(slotIdx, e.target.value as ProfileName)}
                     >
-                      {slot.profile === 'custom:__draft__' && (
-                        <option value="custom:__draft__">Live Editor Draft</option>
-                      )}
-                      {routing.customProfiles.length > 0 && (
+                      {(slot.profile === 'custom:__draft__' || routing.customProfiles.length > 0) && (
                         <optgroup label="Custom Profiles">
+                          {slot.profile === 'custom:__draft__' && (
+                            <option value="custom:__draft__">{slotMeta.label}</option>
+                          )}
                           {routing.customProfiles.map((cp) => (
                             <option key={cp.id} value={cp.id}>
-                              {cp.name}
+                              {routing.getProfileMeta(cp.id).label}
                             </option>
                           ))}
                         </optgroup>

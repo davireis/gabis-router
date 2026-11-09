@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 
@@ -102,6 +102,11 @@ impl WasmRouter {
         self.graph.loaded_cell_count()
     }
 
+    /// Returns the number of interned way and node descriptions currently held in the graph.
+    pub fn description_count(&self) -> usize {
+        self.graph.descriptions.len() + self.graph.node_descriptions.len()
+    }
+
     /// Clears the loaded routing graph and segment index caches while preserving any attached lazy `CellProvider`.
     pub fn clear_graph(&mut self) {
         self.graph.clear_graph_data();
@@ -118,7 +123,7 @@ impl WasmRouter {
         Ok(())
     }
 
-    /// Loads a BRouter profile (.brf) text.
+    /// Loads a BRouter profile (.brf) text and evicts any superseded profile cost tables.
     pub fn load_profile(&mut self, name: &str, content: &str) -> Result<(), JsValue> {
         let Some(lookups) = &self.lookups else {
             return Err(JsValue::from_str("Lookups must be loaded before profiles"));
@@ -126,7 +131,15 @@ impl WasmRouter {
         let profile = Profile::parse(name, content, lookups)
             .map_err(|e| JsValue::from_str(&format!("Failed to parse profile {name}: {e}")))?;
         self.profiles.insert(name.to_string(), profile);
+        self.prune_profile_cost_cache();
         Ok(())
+    }
+
+    /// Removes a loaded profile by name and evicts its cached cost table if unused.
+    pub fn remove_profile(&mut self, name: &str) {
+        if self.profiles.remove(name).is_some() {
+            self.prune_profile_cost_cache();
+        }
     }
 
     /// Returns the number of nodes currently loaded in the graph.
@@ -235,5 +248,19 @@ impl WasmRouter {
         let info = inspect_nearest_way(&mut self.graph, lookups, lon, lat, max_distance_m);
         serde_json::to_string(&info)
             .map_err(|e| JsValue::from_str(&format!("Failed to serialize point info: {e}")))
+    }
+}
+
+impl WasmRouter {
+    fn prune_profile_cost_cache(&self) {
+        let active_hashes: HashSet<u64> =
+            self.profiles.values().map(|p| p.content_hash).collect();
+        if let Ok(mut cache) = self.graph.profile_cost_cache.write() {
+            let before = cache.len();
+            cache.retain(|hash, _| active_hashes.contains(hash));
+            if cache.len() < before {
+                cache.shrink_to_fit();
+            }
+        }
     }
 }

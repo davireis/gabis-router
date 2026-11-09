@@ -267,14 +267,13 @@ assign noise_penalty =
    switch estimated_noise_class=6  1 0.0
 
 assign no_forest_penalty =
-   multiply 0
-   switch estimated_forest_class=   1.0
-   switch estimated_forest_class=1  0.5
-   switch estimated_forest_class=2  0.4
-   switch estimated_forest_class=3  0.25
-   switch estimated_forest_class=4  0.15
-   switch estimated_forest_class=5  0.1
-   switch estimated_forest_class=6  0.0 0.0
+   switch estimated_forest_class=   0
+   switch estimated_forest_class=1  0
+   switch estimated_forest_class=2  0
+   switch estimated_forest_class=3  0
+   switch estimated_forest_class=4  0
+   switch estimated_forest_class=5  0
+   switch estimated_forest_class=6  0 0.0
 
 # Penalty on ordinary roads that are not part of a designated bike route or cycle/bus lane
 assign non_cycleroute_road_penalty =
@@ -419,3 +418,4 @@ assign initialcost
               switch footaccess
                      300
                      1000000
+

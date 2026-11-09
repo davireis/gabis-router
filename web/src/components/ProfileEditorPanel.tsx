@@ -25,6 +25,12 @@ const BASE_TEMPLATE_ORDER: BaseTemplateId[] = [
 
 const DRAFT_PROFILE_ID = 'custom:__draft__';
 
+// Pause window after slider release, toggle clicks, or DSL edits before dispatching a route search.
+// Also enforces Safeguard 1 (Timing separation): after `abortInFlightProfileRoute` terminates a
+// blocked Worker at `t = 0 ms`, waiting 600 ms gives the browser and OS time to unmap the old
+// 500-800 MB `WebAssembly.Memory` heap before the respawned Worker allocates a new search heap.
+const EDITOR_RECALC_DEBOUNCE_MS = 600;
+
 interface SliderRowProps {
   id: string;
   label: string;
@@ -178,166 +184,260 @@ function slugifyProfileId(name: string): string {
 
 export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing, onClose }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [defaultOpenDesktop] = useState<boolean>(
-    () => typeof window === 'undefined' || window.innerWidth > 860,
-  );
 
-  const initialCustom = routing.customProfiles.find((c) => c.id === routing.profile);
+  const activeDraft =
+    routing.draftProfile && routing.draftProfile.id === routing.profile
+      ? routing.draftProfile
+      : null;
+  const savedCustom = routing.customProfiles.find((c) => c.id === routing.profile);
+  const initialCustom = activeDraft || savedCustom;
   const initialTemplate: BaseTemplateId =
     initialCustom?.baseTemplate ||
     (routing.profile === 'gabis-safe-road' || routing.profile === 'gabis-lite-gravel'
       ? (routing.profile as BaseTemplateId)
       : 'gabis-fast-city');
 
+  const initialName = initialCustom
+    ? initialCustom.name
+    : `${TEMPLATE_PRESETS[initialTemplate].shortLabel} Custom`;
+  const initialSummary = initialCustom
+    ? initialCustom.summary
+    : TEMPLATE_PRESETS[initialTemplate].summary;
+  const initialMode: 'detailed' | 'dsl' = initialCustom?.mode || 'detailed';
+  const initialAxes: ProfileAxes = initialCustom
+    ? normalizeProfileAxes(initialCustom.axes, initialTemplate)
+    : { ...TEMPLATE_PRESETS[initialTemplate].axes };
+  const initialDsl = initialCustom
+    ? initialCustom.mode === 'dsl'
+      ? initialCustom.dsl
+      : generateBrfFromAxes(initialAxes, {
+          name: initialName,
+          summary: initialSummary,
+        })
+    : generateBrfFromAxes(initialAxes, {
+        name: initialName,
+        summary: initialSummary,
+      });
+
   const [selectedSource, setSelectedSource] = useState<string>(
-    initialCustom ? initialCustom.id : initialTemplate,
+    savedCustom ? savedCustom.id : initialTemplate,
   );
   const [baseTemplate, setBaseTemplate] = useState<BaseTemplateId>(initialTemplate);
-  const [profileName, setProfileName] = useState<string>(
-    initialCustom ? initialCustom.name : `${TEMPLATE_PRESETS[initialTemplate].shortLabel} Custom`,
-  );
-  const [profileSummary, setProfileSummary] = useState<string>(
-    initialCustom ? initialCustom.summary : TEMPLATE_PRESETS[initialTemplate].summary,
-  );
-  const [mode, setMode] = useState<'detailed' | 'dsl'>(initialCustom?.mode || 'detailed');
-  const [axes, setAxes] = useState<ProfileAxes>(() =>
-    initialCustom
-      ? normalizeProfileAxes(initialCustom.axes, initialTemplate)
-      : { ...TEMPLATE_PRESETS[initialTemplate].axes },
-  );
-  const [dslText, setDslText] = useState<string>(() =>
-    initialCustom
-      ? initialCustom.mode === 'dsl'
-        ? initialCustom.dsl
-        : generateBrfFromAxes(normalizeProfileAxes(initialCustom.axes, initialTemplate), {
-            name: initialCustom.name,
-            summary: initialCustom.summary,
-          })
-      : generateBrfFromAxes(TEMPLATE_PRESETS[initialTemplate].axes, {
-          name: `${TEMPLATE_PRESETS[initialTemplate].shortLabel} Custom`,
-          summary: TEMPLATE_PRESETS[initialTemplate].summary,
-        }),
-  );
-  const [dslDirty, setDslDirty] = useState<boolean>(initialCustom?.mode === 'dsl');
+  const [profileName, setProfileName] = useState<string>(initialName);
+  const [profileSummary, setProfileSummary] = useState<string>(initialSummary);
+  const [mode, setMode] = useState<'detailed' | 'dsl'>(initialMode);
+  const [axes, setAxes] = useState<ProfileAxes>(initialAxes);
+  const [dslText, setDslText] = useState<string>(initialDsl);
+  const [dslDirty, setDslDirty] = useState<boolean>(initialMode === 'dsl');
   const [saveToast, setSaveToast] = useState<string | null>(null);
+  const [isDraggingSlider, setIsDraggingSlider] = useState<boolean>(false);
 
   const activeProfileIdRef = useRef<string>(
-    initialCustom ? initialCustom.id : DRAFT_PROFILE_ID,
+    savedCustom ? savedCustom.id : initialCustom?.id || DRAFT_PROFILE_ID,
   );
+  const axesRef = useRef<ProfileAxes>(initialAxes);
+  axesRef.current = axes;
   const didMountInitRef = useRef<boolean>(false);
-  const lastSubmittedDslRef = useRef<string>(dslText);
+  const lastSubmittedDslRef = useRef<string>(initialDsl);
 
-  // When editor mounts, set slot 0 to the active edited profile and auto-add the base template in slot 1 for live comparison
+  const resolveEditedSlotIdx = (matchProfileId?: string): number => {
+    if (matchProfileId) {
+      const matchingOnActiveRoute = routing.slots.findIndex(
+        (s) => (s.routeIdx ?? 0) === routing.activeRouteIdx && s.profile === matchProfileId,
+      );
+      if (matchingOnActiveRoute !== -1) return matchingOnActiveRoute;
+    }
+    const activeSlot = routing.slots[routing.activeSlotIdx];
+    if (activeSlot && (activeSlot.routeIdx ?? 0) === routing.activeRouteIdx) {
+      return routing.activeSlotIdx;
+    }
+    const firstOnActiveRoute = routing.slots.findIndex(
+      (s) => (s.routeIdx ?? 0) === routing.activeRouteIdx,
+    );
+    return firstOnActiveRoute !== -1 ? firstOnActiveRoute : 0;
+  };
+
+  const syncDraftState = (overrides?: Partial<CustomProfileRecord>) => {
+    const nextRecord: CustomProfileRecord = {
+      id: overrides?.id ?? activeProfileIdRef.current,
+      name: (overrides?.name ?? profileName).trim() || 'Custom Profile',
+      summary: (overrides?.summary ?? profileSummary).trim() || 'Custom cycling profile.',
+      baseTemplate: overrides?.baseTemplate ?? baseTemplate,
+      mode: overrides?.mode ?? (dslDirty ? 'dsl' : mode),
+      axes: overrides?.axes ? { ...overrides.axes } : { ...axesRef.current },
+      dsl: overrides?.dsl ?? dslText,
+      updatedAt: Date.now(),
+    };
+    routing.setDraftProfile(nextRecord);
+  };
+
+  useEffect(() => {
+    if (!isDraggingSlider) return;
+    const finishDrag = () => setIsDraggingSlider(false);
+    window.addEventListener('pointerup', finishDrag);
+    window.addEventListener('pointercancel', finishDrag);
+    window.addEventListener('blur', finishDrag);
+    return () => {
+      window.removeEventListener('pointerup', finishDrag);
+      window.removeEventListener('pointercancel', finishDrag);
+      window.removeEventListener('blur', finishDrag);
+    };
+  }, [isDraggingSlider]);
+
+  // When editor mounts, bind the active slot to the edited custom profile without adding extra slots
   useEffect(() => {
     if (didMountInitRef.current) return;
     didMountInitRef.current = true;
 
     const targetId = activeProfileIdRef.current;
     lastSubmittedDslRef.current = dslText;
+    syncDraftState({ id: targetId, dsl: dslText });
     routing.updateCustomProfileDsl(targetId, dslText, false);
 
-    const activeRouteSlots = routing.slots.filter(
-      (s) => (s.routeIdx ?? 0) === routing.activeRouteIdx,
-    );
-    const primarySlotIdx = routing.slots.findIndex(
-      (s) => (s.routeIdx ?? 0) === routing.activeRouteIdx,
-    );
-    const targetSlotIdx = primarySlotIdx !== -1 ? primarySlotIdx : 0;
+    const targetSlotIdx = resolveEditedSlotIdx(targetId);
     const prevPrimary = routing.slots[targetSlotIdx]?.profile;
     if (prevPrimary !== targetId) {
       routing.setSlotProfile(targetSlotIdx, targetId);
     }
-
-    const compareProf =
-      prevPrimary && !prevPrimary.startsWith('custom:') ? prevPrimary : baseTemplate;
-    if (activeRouteSlots.length === 1) {
-      routing.addProfileSlot(compareProf);
-    }
   }, []);
 
-  // Debounced live route update whenever dslText changes
+  // Debounced route update whenever dslText changes. Waits until any active slider drag ends,
+  // plus EDITOR_RECALC_DEBOUNCE_MS (600 ms) so multi-property tweaks batch into one search and
+  // any terminated Worker's WASM linear heap has time to unmap before the new search starts.
   useEffect(() => {
-    if (dslText === lastSubmittedDslRef.current) return;
+    if (isDraggingSlider) return;
+    if (dslText === lastSubmittedDslRef.current) {
+      return;
+    }
     const timer = setTimeout(() => {
       lastSubmittedDslRef.current = dslText;
       routing.updateCustomProfileDsl(activeProfileIdRef.current, dslText, true);
-    }, 140);
+    }, EDITOR_RECALC_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [dslText, routing.updateCustomProfileDsl]);
+  }, [dslText, isDraggingSlider, selectedSource, routing.updateCustomProfileDsl]);
 
   const handleAxisChange = <K extends keyof ProfileAxes>(key: K, value: ProfileAxes[K]) => {
-    setAxes((prev) => {
-      const next = { ...prev, [key]: value };
-      const nextDsl = generateBrfFromAxes(next, {
-        name: profileName,
-        summary: profileSummary,
-      });
-      setDslText(nextDsl);
-      setDslDirty(false);
-      return next;
+    routing.abortInFlightProfileRoute(activeProfileIdRef.current);
+    const nextAxes = { ...axesRef.current, [key]: value };
+    axesRef.current = nextAxes;
+    const nextDsl = generateBrfFromAxes(nextAxes, {
+      name: profileName,
+      summary: profileSummary,
     });
+    setAxes(nextAxes);
+    setDslText(nextDsl);
+    setDslDirty(false);
+    syncDraftState({ axes: nextAxes, dsl: nextDsl, mode: 'detailed' });
   };
 
   const handleSelectSource = (val: string) => {
+    const prevId = activeProfileIdRef.current;
+    const aborted = routing.abortInFlightProfileRoute(prevId);
+    const targetSlotIdx = resolveEditedSlotIdx(prevId);
     setSelectedSource(val);
     if (val in TEMPLATE_PRESETS) {
       const tpl = val as BaseTemplateId;
       const preset = TEMPLATE_PRESETS[tpl];
       const nextName = `${preset.shortLabel} Custom`;
-      setBaseTemplate(tpl);
-      setProfileName(nextName);
-      setProfileSummary(preset.summary);
-      setAxes({ ...preset.axes });
-      const nextDsl = generateBrfFromAxes(preset.axes, {
+      const nextAxes = { ...preset.axes };
+      const nextDsl = generateBrfFromAxes(nextAxes, {
         name: nextName,
         summary: preset.summary,
       });
-      lastSubmittedDslRef.current = nextDsl;
+      axesRef.current = nextAxes;
+      setBaseTemplate(tpl);
+      setProfileName(nextName);
+      setProfileSummary(preset.summary);
+      setAxes(nextAxes);
+      // Safeguard 1: if an in-flight Worker was just terminated, defer recomputation to the
+      // 600 ms debounce timer instead of allocating a new WASM heap synchronously at t = 0 ms.
+      lastSubmittedDslRef.current = aborted ? '' : nextDsl;
       setDslText(nextDsl);
       setDslDirty(false);
       activeProfileIdRef.current = DRAFT_PROFILE_ID;
+      syncDraftState({
+        id: DRAFT_PROFILE_ID,
+        name: nextName,
+        summary: preset.summary,
+        baseTemplate: tpl,
+        mode: 'detailed',
+        axes: nextAxes,
+        dsl: nextDsl,
+      });
       routing.updateCustomProfileDsl(DRAFT_PROFILE_ID, nextDsl, false);
-      routing.setSlotProfile(0, DRAFT_PROFILE_ID);
-      if (routing.slots.length >= 2) {
-        routing.setSlotProfile(1, tpl);
-      }
+      routing.setSlotProfile(targetSlotIdx, DRAFT_PROFILE_ID, !aborted);
       return;
     }
 
     const saved = routing.customProfiles.find((c) => c.id === val);
     if (saved) {
       const normAxes = normalizeProfileAxes(saved.axes, saved.baseTemplate);
+      axesRef.current = normAxes;
       setBaseTemplate(saved.baseTemplate);
       setProfileName(saved.name);
       setProfileSummary(saved.summary);
       setMode(saved.mode);
       setAxes(normAxes);
-      lastSubmittedDslRef.current = saved.dsl;
+      lastSubmittedDslRef.current = aborted ? '' : saved.dsl;
       setDslText(saved.dsl);
       setDslDirty(saved.mode === 'dsl');
       activeProfileIdRef.current = saved.id;
+      syncDraftState({
+        id: saved.id,
+        name: saved.name,
+        summary: saved.summary,
+        baseTemplate: saved.baseTemplate,
+        mode: saved.mode,
+        axes: normAxes,
+        dsl: saved.dsl,
+      });
       routing.updateCustomProfileDsl(saved.id, saved.dsl, false);
-      routing.setSlotProfile(0, saved.id);
+      routing.setSlotProfile(targetSlotIdx, saved.id, !aborted);
     }
   };
 
   const handleResetToTemplate = () => {
+    routing.abortInFlightProfileRoute(activeProfileIdRef.current);
     const preset = TEMPLATE_PRESETS[baseTemplate];
-    setAxes({ ...preset.axes });
-    const nextDsl = generateBrfFromAxes(preset.axes, {
+    const nextAxes = { ...preset.axes };
+    axesRef.current = nextAxes;
+    const nextDsl = generateBrfFromAxes(nextAxes, {
       name: profileName,
       summary: profileSummary,
     });
+    setAxes(nextAxes);
     setDslText(nextDsl);
     setDslDirty(false);
+    syncDraftState({ axes: nextAxes, dsl: nextDsl, mode: 'detailed' });
   };
 
   const handleSaveProfile = () => {
+    const prevId = activeProfileIdRef.current;
+    const targetSlotIdx = resolveEditedSlotIdx(prevId);
+    const targetSlot = routing.slots[targetSlotIdx];
     const trimmedName = profileName.trim() || 'Custom Profile';
     const id = slugifyProfileId(trimmedName);
     const finalDsl = dslDirty
       ? dslText
-      : generateBrfFromAxes(axes, { name: trimmedName, summary: profileSummary });
+      : generateBrfFromAxes(axesRef.current, { name: trimmedName, summary: profileSummary });
+
+    const hasMatchingRoute =
+      finalDsl === lastSubmittedDslRef.current &&
+      !targetSlot?.isRouting &&
+      Boolean(targetSlot?.route);
+    const alreadyComputingSameProfile =
+      prevId === id &&
+      finalDsl === lastSubmittedDslRef.current &&
+      Boolean(targetSlot?.isRouting);
+    const aborted =
+      prevId !== id || finalDsl !== lastSubmittedDslRef.current
+        ? routing.abortInFlightProfileRoute(prevId)
+        : false;
+    const needsImmediateRecompute =
+      !aborted &&
+      !hasMatchingRoute &&
+      !alreadyComputingSameProfile &&
+      (targetSlot?.waypoints.length ?? 0) >= 2;
 
     const record: CustomProfileRecord = {
       id,
@@ -345,17 +445,19 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
       summary: profileSummary.trim() || 'Custom cycling profile.',
       baseTemplate,
       mode: dslDirty ? 'dsl' : mode,
-      axes: { ...axes },
+      axes: { ...axesRef.current },
       dsl: finalDsl,
       updatedAt: Date.now(),
     };
 
     activeProfileIdRef.current = id;
-    lastSubmittedDslRef.current = finalDsl;
+    lastSubmittedDslRef.current = aborted ? '' : finalDsl;
     setSelectedSource(id);
     setDslText(finalDsl);
-    routing.saveCustomProfile(record);
-    routing.setSlotProfile(0, id);
+    if (targetSlot && targetSlot.profile !== id) {
+      routing.setSlotProfile(targetSlotIdx, id, false);
+    }
+    routing.saveCustomProfile(record, needsImmediateRecompute);
 
     setSaveToast(`Saved "${trimmedName}"`);
     setTimeout(() => setSaveToast(null), 2200);
@@ -384,17 +486,29 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
     reader.onload = (ev) => {
       const text = String(ev.target?.result || '');
       if (!text.trim()) return;
+      const prevId = activeProfileIdRef.current;
+      const aborted = routing.abortInFlightProfileRoute(prevId);
+      const targetSlotIdx = resolveEditedSlotIdx(prevId);
       const stem = file.name.replace(/\.brf$/i, '').replace(/[-_]+/g, ' ');
       const formattedName = stem.charAt(0).toUpperCase() + stem.slice(1);
+      const nextSummary = `Imported from ${file.name}`;
+      setSelectedSource(baseTemplate);
       setProfileName(formattedName);
-      setProfileSummary(`Imported from ${file.name}`);
-      lastSubmittedDslRef.current = text;
+      setProfileSummary(nextSummary);
+      lastSubmittedDslRef.current = aborted ? '' : text;
       setDslText(text);
       setDslDirty(true);
       setMode('dsl');
       activeProfileIdRef.current = DRAFT_PROFILE_ID;
+      syncDraftState({
+        id: DRAFT_PROFILE_ID,
+        name: formattedName,
+        summary: nextSummary,
+        mode: 'dsl',
+        dsl: text,
+      });
       routing.updateCustomProfileDsl(DRAFT_PROFILE_ID, text, false);
-      routing.setSlotProfile(0, DRAFT_PROFILE_ID);
+      routing.setSlotProfile(targetSlotIdx, DRAFT_PROFILE_ID, !aborted);
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -403,27 +517,21 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
   const isSavedCustomSelected = routing.customProfiles.some((c) => c.id === selectedSource);
 
   return (
-    <div id="profile-editor-panel" className="pe-panel">
+    <div
+      id="profile-editor-panel"
+      className="pe-panel"
+      onPointerDownCapture={(e) => {
+        if ((e.target as HTMLElement)?.classList?.contains('pe-range-input')) {
+          setIsDraggingSlider(true);
+          routing.abortInFlightProfileRoute(activeProfileIdRef.current);
+        }
+      }}
+    >
       <div className="pe-header">
         <div className="pe-header-top">
           <div className="pe-title-wrap">
             <Icon name="sliders" size={15} />
             <h2>Profile Editor</h2>
-            {routing.waypoints.length >= 2 && (
-              <span
-                className={`pe-live-pill ${routing.isRouting ? 'is-routing' : ''}`}
-                title={routing.isRouting ? routing.status || 'Recalculating route...' : 'Route updates live as you edit'}
-              >
-                {routing.isRouting ? (
-                  <>
-                    <span className="status-spinner status-spinner-sm" aria-hidden="true" />
-                    <span>Updating…</span>
-                  </>
-                ) : (
-                  <span>Live</span>
-                )}
-              </span>
-            )}
           </div>
           <button
             id="btn-close-profile-editor"
@@ -472,7 +580,11 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
               type="text"
               value={profileName}
               placeholder="My Custom Profile"
-              onChange={(e) => setProfileName(e.target.value)}
+              onChange={(e) => {
+                const nextName = e.target.value;
+                setProfileName(nextName);
+                syncDraftState({ name: nextName });
+              }}
             />
           </div>
         </div>
@@ -564,7 +676,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
           </div>
 
           {/* Section 1: Cycle Networks & Access */}
-          <details className="pe-section" open>
+          <details className="pe-section">
             <summary className="pe-section-summary">
               <span>1. Cycle Networks &amp; Access (route=bicycle)</span>
               <span className="pe-section-badge pe-badge-a">+0–2</span>
@@ -613,7 +725,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
           </details>
 
           {/* Section 2: OSM Way Types (highway=*, aligned with Route Summary Road Type classes) */}
-          <details className="pe-section" open={defaultOpenDesktop}>
+          <details className="pe-section">
             <summary className="pe-section-summary">
               <span>2. Road Type (highway=*)</span>
               <span className="pe-section-badge pe-badge-a">+0–20</span>
@@ -875,7 +987,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
           </details>
 
           {/* Section 3: OSM Surface Penalties (surface=*, aligned with Route Summary Surface classes & subclasses) */}
-          <details className={`pe-section ${!axes.enableSurfacePenalties ? 'pe-section-disabled' : ''}`} open={defaultOpenDesktop}>
+          <details className={`pe-section ${!axes.enableSurfacePenalties ? 'pe-section-disabled' : ''}`}>
             <summary className="pe-section-summary">
               <span>3. Surface Penalties (surface=*)</span>
               <div className="pe-section-summary-right">
@@ -1328,10 +1440,117 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
             </div>
           </details>
 
-          {/* Section 6: Lanes, Lighting & Scenery */}
+          {/* Section 6: Forests & Parks */}
+          <details className={`pe-section ${!axes.enableForestPenalties ? 'pe-section-disabled' : ''}`}>
+            <summary className="pe-section-summary">
+              <span>6. Forests &amp; Parks (estimated_forest_class)</span>
+              <div className="pe-section-summary-right">
+                <span className={`pe-section-badge ${axes.enableForestPenalties ? 'pe-badge-a' : 'pe-badge-off'}`}>
+                  {axes.enableForestPenalties ? '+0–10' : 'Off'}
+                </span>
+                <SectionSummarySwitch
+                  id="pe-enable-forest"
+                  checked={axes.enableForestPenalties}
+                  label="Forests & Parks Penalties"
+                  onChange={(v) => handleAxisChange('enableForestPenalties', v)}
+                />
+              </div>
+            </summary>
+            <div className={`pe-section-content ${!axes.enableForestPenalties ? 'pe-content-disabled' : ''}`}>
+              <div className="pe-subsection-note">
+                Green-corridor overlap (<code>0–6</code>) precomputed by BRouter across a 62 m buffer around each way (<code>natural=wood</code>, <code>landuse=forest|recreation_ground|village_green|allotments|orchard|vineyard</code>, <code>leisure=park|nature_reserve|garden</code>). Penalize Classes <code>0–3</code> to pull routes inside parks and woods, or penalize Classes <code>5–6</code> to avoid unlit woodland.
+              </div>
+              <SliderRow
+                id="pe-forest-untagged"
+                label="Class 0: Outside woods & parks (< 10%, estimated_forest_class=)"
+                value={axes.forestUntaggedPenalty}
+                min={0.0}
+                max={10.0}
+                step={0.1}
+                disallowable
+                formatValue={(v) => `+${Number(v.toFixed(1))}`}
+                tooltip="Additive penalty per metre when < 10% of the way's 62 m buffer overlaps woodland or parks (built-up streets or open farmland)."
+                onChange={(v) => handleAxisChange('forestUntaggedPenalty', v)}
+              />
+              <SliderRow
+                id="pe-forest-c1"
+                label="Class 1: Touching edge (10–20%, estimated_forest_class=1)"
+                value={axes.forestClass1Penalty}
+                min={0.0}
+                max={10.0}
+                step={0.1}
+                disallowable
+                formatValue={(v) => `+${Number(v.toFixed(1))}`}
+                tooltip="Additive penalty per metre on ways with estimated_forest_class=1 (10–20% green buffer overlap, e.g. brushing past a small garden or wood corner)."
+                onChange={(v) => handleAxisChange('forestClass1Penalty', v)}
+              />
+              <SliderRow
+                id="pe-forest-c2"
+                label="Class 2: Scattered greenery (20–40%, estimated_forest_class=2)"
+                value={axes.forestClass2Penalty}
+                min={0.0}
+                max={10.0}
+                step={0.1}
+                disallowable
+                formatValue={(v) => `+${Number(v.toFixed(1))}`}
+                tooltip="Additive penalty per metre on ways with estimated_forest_class=2 (20–40% green buffer overlap, e.g. passing small green patches or allotments)."
+                onChange={(v) => handleAxisChange('forestClass2Penalty', v)}
+              />
+              <SliderRow
+                id="pe-forest-c3"
+                label="Class 3: Park or wood boundary (40–60%, estimated_forest_class=3)"
+                value={axes.forestClass3Penalty}
+                min={0.0}
+                max={10.0}
+                step={0.1}
+                disallowable
+                formatValue={(v) => `+${Number(v.toFixed(1))}`}
+                tooltip="Additive penalty per metre on ways with estimated_forest_class=3 (40–60% green buffer overlap, typically a road running along the outer boundary of a park)."
+                onChange={(v) => handleAxisChange('forestClass3Penalty', v)}
+              />
+              <SliderRow
+                id="pe-forest-c4"
+                label="Class 4: Mostly wooded / park (60–80%, estimated_forest_class=4)"
+                value={axes.forestClass4Penalty}
+                min={0.0}
+                max={10.0}
+                step={0.1}
+                disallowable
+                formatValue={(v) => `+${Number(v.toFixed(1))}`}
+                tooltip="Additive penalty per metre on ways with estimated_forest_class=4 (60–80% green buffer overlap, mostly inside a park or wooded corridor)."
+                onChange={(v) => handleAxisChange('forestClass4Penalty', v)}
+              />
+              <SliderRow
+                id="pe-forest-c5"
+                label="Class 5: Inside park or wood (80–98%, estimated_forest_class=5)"
+                value={axes.forestClass5Penalty}
+                min={0.0}
+                max={10.0}
+                step={0.1}
+                disallowable
+                formatValue={(v) => `+${Number(v.toFixed(1))}`}
+                tooltip="Additive penalty per metre on ways with estimated_forest_class=5 (80–98% green buffer overlap, inside a park or wood near an edge or clearing)."
+                onChange={(v) => handleAxisChange('forestClass5Penalty', v)}
+              />
+              <SliderRow
+                id="pe-forest-c6"
+                label="Class 6: Deep inside park or forest (≥ 98%, estimated_forest_class=6)"
+                value={axes.forestClass6Penalty}
+                min={0.0}
+                max={10.0}
+                step={0.1}
+                disallowable
+                formatValue={(v) => `+${Number(v.toFixed(1))}`}
+                tooltip="Additive penalty per metre on ways with estimated_forest_class=6 (≥ 98% green buffer overlap, fully enclosed inside a park, common, or forest)."
+                onChange={(v) => handleAxisChange('forestClass6Penalty', v)}
+              />
+            </div>
+          </details>
+
+          {/* Section 7: Lanes & Lighting */}
           <details className={`pe-section ${!axes.enableEnvironmentPenalties ? 'pe-section-disabled' : ''}`}>
             <summary className="pe-section-summary">
-              <span>6. Lanes, Lighting &amp; Scenery</span>
+              <span>7. Lanes &amp; Lighting (lanes, lit)</span>
               <div className="pe-section-summary-right">
                 <span className={`pe-section-badge ${axes.enableEnvironmentPenalties ? 'pe-badge-a' : 'pe-badge-off'}`}>
                   {axes.enableEnvironmentPenalties ? '+0–5' : 'Off'}
@@ -1339,16 +1558,12 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 <SectionSummarySwitch
                   id="pe-enable-environment"
                   checked={axes.enableEnvironmentPenalties}
-                  label="Lanes, Lighting & Scenery Penalties"
+                  label="Lanes & Lighting Penalties"
                   onChange={(v) => handleAxisChange('enableEnvironmentPenalties', v)}
                 />
               </div>
             </summary>
             <div className={`pe-section-content ${!axes.enableEnvironmentPenalties ? 'pe-content-disabled' : ''}`}>
-              <div className="pe-subsection-header">
-                <span>6a. Lanes &amp; Lighting (lanes, lit)</span>
-                <span className="pe-section-badge pe-badge-a">+0–5</span>
-              </div>
               <div className="pe-subsection-note">
                 Applies to OSM <code>lanes=*</code> and <code>lit=*</code> tags. Use the untagged lighting slider below to decide whether ways without a <code>lit=*</code> tag are penalized.
               </div>
@@ -1387,25 +1602,6 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 tooltip="Additive penalty when a way has no lit=* tag in OSM (lighting unknown). Keep at +0.0 unless you want to strictly require lit=yes ways."
                 onChange={(v) => handleAxisChange('untaggedLitPenalty', v)}
               />
-
-              <div className="pe-subsection-header pe-subsection-divider">
-                <span>6b. Forests &amp; Parks (estimated_forest_class)</span>
-                <span className="pe-section-badge pe-badge-a">+0–3</span>
-              </div>
-              <div className="pe-subsection-note">
-                Heuristic woodland/park proximity (<code>1–6</code>). Ways with no <code>estimated_forest_class</code> tag are outside mapped woods and receive the full slider penalty below; ways inside <code>class=6</code> forest receive <strong>+0.0</strong>.
-              </div>
-              <SliderRow
-                id="pe-forest-penalty"
-                label="Prefer forests & parks: penalty outside woods (estimated_forest_class)"
-                value={axes.noForestPenalty}
-                min={0.0}
-                max={3.0}
-                step={0.1}
-                formatValue={(v) => `+${Number(v.toFixed(1))}`}
-                tooltip="Additive penalty applied when a way is outside mapped woodland or parks (1.0x when estimated_forest_class is untagged/none, stepping down from 0.5x at class 1 to +0.0 inside class 6 forest)."
-                onChange={(v) => handleAxisChange('noForestPenalty', v)}
-              />
             </div>
           </details>
 
@@ -1417,10 +1613,10 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
             </div>
           </div>
 
-          {/* Section 7: Climbing & Hills */}
+          {/* Section 8: Climbing & Hills */}
           <details className={`pe-section ${!axes.considerElevation ? 'pe-section-disabled' : ''}`}>
             <summary className="pe-section-summary">
-              <span>7. Climbing &amp; Descents</span>
+              <span>8. Climbing &amp; Descents</span>
               <div className="pe-section-summary-right">
                 <span className={`pe-section-badge ${axes.considerElevation ? 'pe-badge-c' : 'pe-badge-off'}`}>
                   {axes.considerElevation ? '+0–200 m/m' : 'Off'}
@@ -1481,10 +1677,10 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
             </div>
           </details>
 
-          {/* Section 8: Turns, Junctions & Barriers (all 0 to 300 m) */}
+          {/* Section 9: Turns, Junctions & Barriers (all 0 to 300 m) */}
           <details className={`pe-section ${!axes.enableTurnPenalties ? 'pe-section-disabled' : ''}`}>
             <summary className="pe-section-summary">
-              <span>8. Turns, Junctions &amp; Barriers</span>
+              <span>9. Turns, Junctions &amp; Barriers</span>
               <div className="pe-section-summary-right">
                 <span className={`pe-section-badge ${axes.enableTurnPenalties ? 'pe-badge-c' : 'pe-badge-off'}`}>
                   {axes.enableTurnPenalties ? '+0–300 m' : 'Off'}
@@ -1500,7 +1696,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
             <div className="pe-section-content">
               <div className={`pe-section-subcontrols ${!axes.enableTurnPenalties ? 'pe-content-disabled' : ''}`}>
                 <div className="pe-subsection-header">
-                  <span>8a. Turn Geometry (turncost)</span>
+                  <span>9a. Turn Geometry (turncost)</span>
                   <span className="pe-section-badge pe-badge-c">+0–300 m</span>
                 </div>
                 <SliderRow
@@ -1538,7 +1734,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 />
 
                 <div className="pe-subsection-header pe-subsection-divider">
-                  <span>8b. Junction Nodes &amp; Road Transitions</span>
+                  <span>9b. Junction Nodes &amp; Road Transitions</span>
                   <span className="pe-section-badge pe-badge-c">+0–300 m</span>
                 </div>
                 <SliderRow
@@ -1576,7 +1772,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 />
 
                 <div className="pe-subsection-header pe-subsection-divider">
-                  <span>8c. Uncontrolled Road Crossings (estimated_crossing_class=1..6)</span>
+                  <span>9c. Uncontrolled Road Crossings (estimated_crossing_class=1..6)</span>
                   <span className="pe-section-badge pe-badge-c">+0–1000 m</span>
                 </div>
                 <SliderRow
@@ -1653,7 +1849,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 />
 
                 <div className="pe-subsection-header pe-subsection-divider">
-                  <span>8d. Turns Across Oncoming Traffic (cost_ToRight_from_H)</span>
+                  <span>9d. Turns Across Oncoming Traffic (cost_ToRight_from_H)</span>
                   <span className="pe-section-badge pe-badge-c">+0–400 m</span>
                 </div>
                 <SliderRow
@@ -1724,7 +1920,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
                 />
 
                 <div className="pe-subsection-header pe-subsection-divider">
-                  <span>8e. One-Ways, Barriers, Steps &amp; Ferries</span>
+                  <span>9e. One-Ways, Barriers, Steps &amp; Ferries</span>
                   <span className="pe-section-badge pe-badge-c">+0–300</span>
                 </div>
                 <SliderRow
@@ -1778,7 +1974,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
           {/* Section 9: Rider & Bike Physics */}
           <details className="pe-section">
             <summary className="pe-section-summary">
-              <span>9. Rider &amp; Bike Physics</span>
+              <span>10. Rider &amp; Bike Physics</span>
               <span className="pe-section-badge">Speed &amp; Time</span>
             </summary>
             <div className="pe-section-content">
@@ -1832,7 +2028,7 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
         <div className="pe-body pe-dsl-body">
           <div className="pe-dsl-bar">
             <span className="pe-dsl-info">
-              Edit BRouter <code>.brf</code> script directly. Changes re-route live.
+              Edit BRouter <code>.brf</code> script directly.
             </span>
             <a
               href="https://brouter.de/brouter/costfunctions.html"
@@ -1849,8 +2045,11 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
             spellCheck={false}
             value={dslText}
             onChange={(e) => {
-              setDslText(e.target.value);
+              const nextText = e.target.value;
+              routing.abortInFlightProfileRoute(activeProfileIdRef.current);
+              setDslText(nextText);
               setDslDirty(true);
+              syncDraftState({ dsl: nextText, mode: 'dsl' });
             }}
           />
         </div>

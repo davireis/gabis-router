@@ -82,7 +82,14 @@ export interface ProfileAxes {
   noiseClass6Penalty: number; // estimated_noise_class=6
   noiseUntaggedPenalty: number; // estimated_noise_class= missing
 
-  noForestPenalty: number; // estimated_forest_class (penalty outside woods/parks)
+  enableForestPenalties: boolean;
+  forestUntaggedPenalty: number; // estimated_forest_class= missing (< 10% green buffer)
+  forestClass1Penalty: number; // estimated_forest_class=1 (10-20% green buffer)
+  forestClass2Penalty: number; // estimated_forest_class=2 (20-40% green buffer)
+  forestClass3Penalty: number; // estimated_forest_class=3 (40-60% green buffer)
+  forestClass4Penalty: number; // estimated_forest_class=4 (60-80% green buffer)
+  forestClass5Penalty: number; // estimated_forest_class=5 (80-98% green buffer)
+  forestClass6Penalty: number; // estimated_forest_class=6 (>= 98% green buffer)
 
   // 6. Climbing & Descents (0 to 200 m/m, 0.0 to 8.0 %)
   considerElevation: boolean;
@@ -218,7 +225,14 @@ export const TEMPLATE_PRESETS: Record<
       noiseClass5Penalty: 0.5,
       noiseClass6Penalty: 1.0,
       noiseUntaggedPenalty: 0.0,
-      noForestPenalty: 0.0,
+      enableForestPenalties: true,
+      forestUntaggedPenalty: 0.0,
+      forestClass1Penalty: 0.0,
+      forestClass2Penalty: 0.0,
+      forestClass3Penalty: 0.0,
+      forestClass4Penalty: 0.0,
+      forestClass5Penalty: 0.0,
+      forestClass6Penalty: 0.0,
 
       considerElevation: true,
       uphillCost: 0,
@@ -331,7 +345,14 @@ export const TEMPLATE_PRESETS: Record<
       noiseClass5Penalty: 0.3,
       noiseClass6Penalty: 0.4,
       noiseUntaggedPenalty: 0.0,
-      noForestPenalty: 0.0,
+      enableForestPenalties: false,
+      forestUntaggedPenalty: 0.0,
+      forestClass1Penalty: 0.0,
+      forestClass2Penalty: 0.0,
+      forestClass3Penalty: 0.0,
+      forestClass4Penalty: 0.0,
+      forestClass5Penalty: 0.0,
+      forestClass6Penalty: 0.0,
 
       considerElevation: true,
       uphillCost: 0,
@@ -444,7 +465,14 @@ export const TEMPLATE_PRESETS: Record<
       noiseClass5Penalty: 0.5,
       noiseClass6Penalty: 1.0,
       noiseUntaggedPenalty: 0.0,
-      noForestPenalty: 0.0,
+      enableForestPenalties: true,
+      forestUntaggedPenalty: 0.0,
+      forestClass1Penalty: 0.0,
+      forestClass2Penalty: 0.0,
+      forestClass3Penalty: 0.0,
+      forestClass4Penalty: 0.0,
+      forestClass5Penalty: 0.0,
+      forestClass6Penalty: 0.0,
 
       considerElevation: true,
       uphillCost: 0,
@@ -502,6 +530,17 @@ export function normalizeProfileAxes(
     merged.crossingClass4Cost = Math.round(legacyBusyCrossing * 0.7);
     merged.crossingClass5Cost = Math.round(legacyBusyCrossing * 0.85);
     merged.crossingClass6Cost = Math.round(legacyBusyCrossing);
+  }
+  const legacyNoForest = (raw as any).noForestPenalty;
+  if (typeof legacyNoForest === 'number' && legacyNoForest > 0 && raw.forestUntaggedPenalty === undefined) {
+    merged.enableForestPenalties = raw.enableEnvironmentPenalties !== false;
+    merged.forestUntaggedPenalty = Number(legacyNoForest.toFixed(2));
+    merged.forestClass1Penalty = Number((legacyNoForest * 0.5).toFixed(2));
+    merged.forestClass2Penalty = Number((legacyNoForest * 0.4).toFixed(2));
+    merged.forestClass3Penalty = Number((legacyNoForest * 0.25).toFixed(2));
+    merged.forestClass4Penalty = Number((legacyNoForest * 0.15).toFixed(2));
+    merged.forestClass5Penalty = Number((legacyNoForest * 0.1).toFixed(2));
+    merged.forestClass6Penalty = 0.0;
   }
   for (const key of Object.keys(defaults) as Array<keyof ProfileAxes>) {
     const val = raw[key];
@@ -837,15 +876,14 @@ assign noise_penalty =
 
 assign no_forest_penalty =
    ${
-     axes.enableEnvironmentPenalties !== false
-       ? `multiply ${fmtNum(axes.noForestPenalty)}
-   switch estimated_forest_class=   1.0
-   switch estimated_forest_class=1  0.5
-   switch estimated_forest_class=2  0.4
-   switch estimated_forest_class=3  0.25
-   switch estimated_forest_class=4  0.15
-   switch estimated_forest_class=5  0.1
-   switch estimated_forest_class=6  0.0 0.0`
+     axes.enableForestPenalties !== false
+       ? `switch estimated_forest_class=   ${fmtNum(axes.forestUntaggedPenalty)}
+   switch estimated_forest_class=1  ${fmtNum(axes.forestClass1Penalty)}
+   switch estimated_forest_class=2  ${fmtNum(axes.forestClass2Penalty)}
+   switch estimated_forest_class=3  ${fmtNum(axes.forestClass3Penalty)}
+   switch estimated_forest_class=4  ${fmtNum(axes.forestClass4Penalty)}
+   switch estimated_forest_class=5  ${fmtNum(axes.forestClass5Penalty)}
+   switch estimated_forest_class=6  ${fmtNum(axes.forestClass6Penalty)} 0.0`
        : '0.0'
    }
 

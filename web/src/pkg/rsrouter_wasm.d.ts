@@ -9,6 +9,10 @@ export class WasmRouter {
      */
     clear_graph(): void;
     /**
+     * Returns the number of interned way and node descriptions currently held in the graph.
+     */
+    description_count(): number;
+    /**
      * Returns the number of edges currently loaded in the graph.
      */
     edge_count(): number;
@@ -22,7 +26,7 @@ export class WasmRouter {
      */
     load_lookups(text: string): void;
     /**
-     * Loads a BRouter profile (.brf) text.
+     * Loads a BRouter profile (.brf) text and evicts any superseded profile cost tables.
      */
     load_profile(name: string, content: string): void;
     /**
@@ -40,6 +44,10 @@ export class WasmRouter {
      * Returns the number of nodes currently loaded in the graph.
      */
     node_count(): number;
+    /**
+     * Removes a loaded profile by name and evicts its cached cost table if unused.
+     */
+    remove_profile(name: string): void;
     /**
      * Computes a route for given waypoints ("lon,lat|lon,lat") and returns a GeoJSON string.
      */
@@ -62,6 +70,7 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_wasmrouter_free: (a: number, b: number) => void;
     readonly wasmrouter_clear_graph: (a: number) => void;
+    readonly wasmrouter_description_count: (a: number) => number;
     readonly wasmrouter_edge_count: (a: number) => number;
     readonly wasmrouter_inspect_point: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly wasmrouter_load_lookups: (a: number, b: number, c: number) => [number, number];
@@ -70,6 +79,7 @@ export interface InitOutput {
     readonly wasmrouter_match_gpx_waypoints: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly wasmrouter_new: () => number;
     readonly wasmrouter_node_count: (a: number) => number;
+    readonly wasmrouter_remove_profile: (a: number, b: number, c: number) => void;
     readonly wasmrouter_route: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number, number];
     readonly wasmrouter_set_segment_reader: (a: number, b: any, c: any) => void;
     readonly wasmrouter_take_missing_segments: (a: number) => [number, number];

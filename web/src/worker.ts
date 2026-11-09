@@ -1,19 +1,39 @@
-import type { RouteResponse, WorkerMessage, LatLon, PointWayInfo } from './types.ts';
+import type { RouteResponse, WorkerMessage, WorkerPhase, LatLon, PointWayInfo } from './types.ts';
 import init, { WasmRouter } from './pkg/rsrouter_wasm.js';
-import { SEGMENT_CACHE_NAME, MIN_RD5_BYTES, fetchAndCacheSegment, isHtml } from './segment-cache.ts';
+import {
+  SEGMENT_CACHE_NAME,
+  MIN_RD5_BYTES,
+  UK_SEGMENTS,
+  fetchAndCacheSegment,
+  isHtml,
+} from './segment-cache.ts';
 
 // Dedicated Web Worker running rsrouter WebAssembly off the main UI thread.
 // Uses BRouter-style lazy on-demand MicroCache cell loading via disk-backed Blob.slice + FileReaderSync.
 
 const MAX_CACHED_CELLS = 2500;
+const MAX_CACHED_DESCRIPTIONS = 250_000;
+const CANCELLED_ERR = '__CANCELLED__';
+const UK_SEGMENT_SET = new Set<string>(UK_SEGMENTS);
 
 let router: WasmRouter | null = null;
+// Safeguard 2 (Shared WebAssembly.Module):
+// Pre-compiled WebAssembly.Module supplied by the main thread via INIT. Respawned Workers
+// instantiate this module directly instead of re-fetching and recompiling .wasm JIT code.
+let sharedWasmModule: WebAssembly.Module | undefined;
+let resolveInitReceived: (() => void) | null = null;
+const initReceived = new Promise<void>((resolve) => {
+  resolveInitReceived = resolve;
+});
 let isOfflineMode = false;
 const latestSlotRouteIds = new Map<number, string>();
 let latestImportId: string | null = null;
 let latestInspectId: string | null = null;
 const loadedBuiltInProfiles = new Set<string>();
 const customProfileContents = new Map<string, string>();
+const customProfileErrors = new Map<string, string>();
+let customProfileLoadSeq = 0;
+const latestCustomProfileLoadSeq = new Map<string, number>();
 
 // Disk-backed Blob handles for 5°×5° .rd5 files (0 bytes of JS heap per file until a slice is read).
 const segmentBlobs = new Map<string, Blob>();
@@ -23,6 +43,10 @@ const fileReaderSync = new FileReaderSync();
 
 function status(message: string) {
   postMessage({ type: 'STATUS', message } satisfies WorkerMessage);
+}
+
+function setWorkerPhase(phase: WorkerPhase) {
+  postMessage({ type: 'WORKER_PHASE', phase } satisfies WorkerMessage);
 }
 
 async function fetchWithTimeout(url: string, timeoutMs = 6000): Promise<Response> {
@@ -143,6 +167,13 @@ async function openSegmentBlob(
   if (!required && failedSegments.has(name)) {
     return false;
   }
+  if (!required && !UK_SEGMENT_SET.has(name)) {
+    // Coastal routes near 50N such as Brighton can expand A* south into W5_N45 or E0_N45 when
+    // road penalties are high. Those tiles are outside the UK and Ireland dataset on R2.
+    // Skip non-required out-of-coverage tiles immediately to avoid wasted probes and graph resets.
+    failedSegments.add(name);
+    return false;
+  }
 
   const key = `/segments4/${name}.rd5`;
   const cache = await caches.open(SEGMENT_CACHE_NAME);
@@ -183,6 +214,9 @@ async function openSegmentBlob(
   }
 
   try {
+    // Safeguard 3 (Download safety): report 'downloading' before starting a network .rd5 fetch
+    // so the main thread never calls worker.terminate() mid-stream before CacheStorage commits.
+    setWorkerPhase('downloading');
     status(`Fetching ${name}.rd5...`);
     const bytes = await fetchAndCacheSegment(name, (received, total) => {
       const mb = (received / (1024 * 1024)).toFixed(1);
@@ -212,8 +246,11 @@ async function openSegmentBlob(
 async function ensureRouter(): Promise<WasmRouter> {
   if (router) return router;
 
+  await initReceived;
   status('Initializing WebAssembly engine...');
-  await init();
+  // Safeguard 2: instantiate the shared pre-compiled WebAssembly.Module when available
+  // so respawned Workers reuse compiled machine code instead of recompiling .wasm.
+  await init(sharedWasmModule ? { module_or_path: sharedWasmModule } : undefined);
   const r = new WasmRouter();
   loadedBuiltInProfiles.clear();
 
@@ -242,8 +279,9 @@ async function ensureRouter(): Promise<WasmRouter> {
   for (const [name, content] of customProfileContents.entries()) {
     try {
       r.load_profile(name, content);
-    } catch {
-      // ignore invalid custom profile during fresh re-init
+      customProfileErrors.delete(name);
+    } catch (err) {
+      customProfileErrors.set(name, String(err));
     }
   }
 
@@ -256,6 +294,10 @@ async function ensureRouter(): Promise<WasmRouter> {
  */
 async function ensureProfileLoaded(r: WasmRouter, profile: string): Promise<void> {
   if (profile.startsWith('custom:')) {
+    const parseErr = customProfileErrors.get(profile);
+    if (parseErr) {
+      throw new Error(parseErr);
+    }
     const content = customProfileContents.get(profile);
     if (!content) {
       throw new Error(`Custom profile "${profile}" is not loaded`);
@@ -278,15 +320,21 @@ async function runWithLazySegments<T>(
   initialPoints: LatLon[],
   profile: string,
   op: (r: WasmRouter) => T,
+  isCancelled?: () => boolean,
 ): Promise<T> {
+  if (isCancelled?.()) throw new Error(CANCELLED_ERR);
   let r = await ensureRouter();
   await ensureProfileLoaded(r, profile);
-  if (r.loaded_cell_count() > MAX_CACHED_CELLS) {
+  if (
+    r.loaded_cell_count() > MAX_CACHED_CELLS ||
+    r.description_count() > MAX_CACHED_DESCRIPTIONS
+  ) {
     r.clear_graph();
   }
 
   const requiredSegments = new Set(initialPoints.map((w) => segmentName(w.lon, w.lat)));
   for (const seg of requiredSegments) {
+    if (isCancelled?.()) throw new Error(CANCELLED_ERR);
     await openSegmentBlob(seg, true);
   }
 
@@ -302,6 +350,7 @@ async function runWithLazySegments<T>(
     }
   }
   for (const seg of nearbySegments) {
+    if (isCancelled?.()) throw new Error(CANCELLED_ERR);
     await openSegmentBlob(seg, false, true);
   }
 
@@ -310,9 +359,11 @@ async function runWithLazySegments<T>(
   let retriedFreshRouter = false;
 
   while (true) {
+    if (isCancelled?.()) throw new Error(CANCELLED_ERR);
     let result: T | undefined;
     let opErr: unknown = null;
     try {
+      setWorkerPhase('calculating');
       result = op(r);
     } catch (err) {
       opErr = err;
@@ -323,7 +374,7 @@ async function runWithLazySegments<T>(
         msg.includes('recursive use of an object')
       ) {
         router = null;
-        if (!retriedFreshRouter) {
+        if (!retriedFreshRouter && !isCancelled?.()) {
           retriedFreshRouter = true;
           retriedCleanGraph = true;
           r = await ensureRouter();
@@ -334,9 +385,11 @@ async function runWithLazySegments<T>(
       }
     }
 
+    if (isCancelled?.()) throw new Error(CANCELLED_ERR);
     const missing = r.take_missing_segments();
     let openedAny = false;
     for (const seg of missing) {
+      if (isCancelled?.()) throw new Error(CANCELLED_ERR);
       if (await openSegmentBlob(seg, false)) {
         openedAny = true;
       }
@@ -348,7 +401,14 @@ async function runWithLazySegments<T>(
       continue;
     }
     if (opErr !== null) {
-      if (!retriedCleanGraph) {
+      const errMsg = String(opErr);
+      const isLogicalError =
+        errMsg.includes('No path found') ||
+        errMsg.includes('could not be mapped') ||
+        errMsg.includes('exceeded maximum node limit') ||
+        errMsg.includes('Profile not found') ||
+        errMsg.includes('Failed to parse');
+      if (!isLogicalError && !retriedCleanGraph && !isCancelled?.()) {
         retriedCleanGraph = true;
         r.clear_graph();
         continue;
@@ -381,19 +441,28 @@ function extractGpxTrackPoints(gpxXml: string): LatLon[] {
   return [];
 }
 
-async function handleMessage(msg: WorkerMessage): Promise<void> {
+async function handleMessage(msg: WorkerMessage, customSeq?: number): Promise<void> {
   switch (msg.type) {
     case 'INIT': {
+      if (msg.wasmModule) {
+        sharedWasmModule = msg.wasmModule;
+      }
+      resolveInitReceived?.();
+      resolveInitReceived = null;
       status('Router ready. Click on the map to set waypoints.');
       break;
     }
 
     case 'LOAD_CUSTOM_PROFILE': {
+      if (customSeq !== undefined && latestCustomProfileLoadSeq.get(msg.name) !== customSeq) {
+        break;
+      }
       try {
         customProfileContents.set(msg.name, msg.content);
         if (router || msg.id) {
           const r = await ensureRouter();
           r.load_profile(msg.name, msg.content);
+          customProfileErrors.delete(msg.name);
         }
         postMessage({
           type: 'CUSTOM_PROFILE_LOADED',
@@ -402,6 +471,7 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
           ok: true,
         } satisfies WorkerMessage);
       } catch (err) {
+        customProfileErrors.set(msg.name, String(err));
         postMessage({
           type: 'CUSTOM_PROFILE_LOADED',
           id: msg.id,
@@ -413,9 +483,22 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
       break;
     }
 
+    case 'REMOVE_CUSTOM_PROFILE': {
+      customProfileContents.delete(msg.name);
+      customProfileErrors.delete(msg.name);
+      latestCustomProfileLoadSeq.delete(msg.name);
+      try {
+        router?.remove_profile(msg.name);
+      } catch {
+        // ignore if router was reset
+      }
+      break;
+    }
+
     case 'ROUTE_REQUEST': {
       const slotIdx = msg.slotIdx ?? 0;
-      if (latestSlotRouteIds.get(slotIdx) !== msg.id) return;
+      const isCancelled = () => latestSlotRouteIds.get(slotIdx) !== msg.id;
+      if (isCancelled()) return;
       try {
         const { waypoints, profile, alternativeIdx, nogos } = msg.payload;
         const waypointsStr = waypoints.map((w) => `${w.lon},${w.lat}`).join('|');
@@ -430,10 +513,13 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
             : undefined;
 
         status(`Calculating route (${waypoints.length} points, ${profile})...`);
-        const geojsonStr = await runWithLazySegments(waypoints, profile, (r) =>
-          r.route(waypointsStr, profile, alternativeIdx ?? 0, nogosStr),
+        const geojsonStr = await runWithLazySegments(
+          waypoints,
+          profile,
+          (r) => r.route(waypointsStr, profile, alternativeIdx ?? 0, nogosStr),
+          isCancelled,
         );
-        if (latestSlotRouteIds.get(slotIdx) !== msg.id) return;
+        if (isCancelled()) return;
 
         const response: RouteResponse = JSON.parse(geojsonStr);
         postMessage({
@@ -443,18 +529,22 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
           payload: response,
         } satisfies WorkerMessage);
       } catch (err) {
+        if (isCancelled() || String(err).includes(CANCELLED_ERR)) return;
         postMessage({
           type: 'ROUTE_ERROR',
           id: msg.id,
           slotIdx,
           error: String(err),
         } satisfies WorkerMessage);
+      } finally {
+        setWorkerPhase('idle');
       }
       break;
     }
 
     case 'IMPORT_GPX_REQUEST': {
-      if (msg.id !== latestImportId) return;
+      const isCancelled = () => msg.id !== latestImportId;
+      if (isCancelled()) return;
       try {
         const { gpxXml, profile, toleranceM } = msg.payload;
         const trackPoints = extractGpxTrackPoints(gpxXml);
@@ -463,10 +553,13 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
         }
 
         status(`Matching GPX track (${trackPoints.length} points, ${profile})...`);
-        const rawJson = await runWithLazySegments(trackPoints, profile, (r) =>
-          r.match_gpx_waypoints(gpxXml, profile, toleranceM ?? 20.0),
+        const rawJson = await runWithLazySegments(
+          trackPoints,
+          profile,
+          (r) => r.match_gpx_waypoints(gpxXml, profile, toleranceM ?? 20.0),
+          isCancelled,
         );
-        if (msg.id !== latestImportId) return;
+        if (isCancelled()) return;
 
         const parsed = JSON.parse(rawJson) as { waypoints: LatLon[]; route: RouteResponse };
         postMessage({
@@ -475,7 +568,10 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
           payload: parsed,
         } satisfies WorkerMessage);
       } catch (err) {
+        if (isCancelled() || String(err).includes(CANCELLED_ERR)) return;
         postMessage({ type: 'ROUTE_ERROR', id: msg.id, error: String(err) } satisfies WorkerMessage);
+      } finally {
+        setWorkerPhase('idle');
       }
       break;
     }
@@ -537,7 +633,21 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
     isOfflineMode = msg.offline;
     return;
   }
-  if (msg.type === 'ROUTE_REQUEST') {
+  if (msg.type === 'INIT') {
+    if (msg.wasmModule) {
+      sharedWasmModule = msg.wasmModule;
+    }
+    resolveInitReceived?.();
+    resolveInitReceived = null;
+    status('Router ready. Click on the map to set waypoints.');
+    return;
+  }
+  let customSeq: number | undefined;
+  if (msg.type === 'LOAD_CUSTOM_PROFILE') {
+    customProfileContents.set(msg.name, msg.content);
+    customSeq = ++customProfileLoadSeq;
+    latestCustomProfileLoadSeq.set(msg.name, customSeq);
+  } else if (msg.type === 'ROUTE_REQUEST') {
     latestSlotRouteIds.set(msg.slotIdx ?? 0, msg.id);
   } else if (msg.type === 'IMPORT_GPX_REQUEST') {
     latestImportId = msg.id;
@@ -546,7 +656,7 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
     latestInspectId = msg.id;
   }
   queue = queue
-    .then(() => handleMessage(msg))
+    .then(() => handleMessage(msg, customSeq))
     .catch((err) => {
       console.error('Worker queue error:', err);
     });

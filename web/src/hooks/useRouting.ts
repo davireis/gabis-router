@@ -14,6 +14,7 @@ import {
   type ProfileName,
   type RouteSlotState,
   type WorkerMessage,
+  type WorkerPhase,
 } from '../types.ts';
 import { HistoryStack } from '../history.ts';
 import { legIndexAt } from '../utils/geo.ts';
@@ -26,6 +27,47 @@ import {
 const STORAGE_KEY = 'rsrouter_route';
 const MAX_UNDO = 50;
 export const DEFAULT_AVOID_RADIUS_M = 50;
+
+// Safeguard 2 (Shared WebAssembly.Module compilation):
+// Compile rsrouter_wasm_bg.wasm once on the main thread and pass the resulting
+// WebAssembly.Module to every spawned Worker via INIT. WebAssembly.Module is
+// structured-cloneable across postMessage, so respawned Workers after an in-flight
+// abort call WebAssembly.instantiate(module, imports) directly without re-fetching
+// or recompiling .wasm JIT machine code pages.
+let cachedWasmModule: WebAssembly.Module | undefined;
+let wasmModulePromise: Promise<WebAssembly.Module | undefined> | null = null;
+
+function getSharedWasmModule(): Promise<WebAssembly.Module | undefined> {
+  if (cachedWasmModule) {
+    return Promise.resolve(cachedWasmModule);
+  }
+  if (!wasmModulePromise) {
+    const wasmUrl = new URL('../pkg/rsrouter_wasm_bg.wasm', import.meta.url);
+    wasmModulePromise = (async () => {
+      try {
+        if (typeof WebAssembly.compileStreaming === 'function') {
+          try {
+            const mod = await WebAssembly.compileStreaming(fetch(wasmUrl));
+            cachedWasmModule = mod;
+            return mod;
+          } catch {
+            // Fall back to ArrayBuffer compilation if server MIME type is not application/wasm.
+          }
+        }
+        const res = await fetch(wasmUrl);
+        if (!res.ok) return undefined;
+        const bytes = await res.arrayBuffer();
+        const mod = await WebAssembly.compile(bytes);
+        cachedWasmModule = mod;
+        return mod;
+      } catch {
+        wasmModulePromise = null;
+        return undefined;
+      }
+    })();
+  }
+  return wasmModulePromise;
+}
 
 interface RouteHistorySnapshot {
   waypoints: LatLon[];
@@ -338,6 +380,7 @@ export function useRouting(isOfflineMode: boolean) {
   const [customProfiles, setCustomProfiles] = useState<CustomProfileRecord[]>(() =>
     loadSavedCustomProfiles(),
   );
+  const [draftProfile, setDraftProfileState] = useState<CustomProfileRecord | null>(null);
   const [customProfileError, setCustomProfileError] = useState<string | null>(null);
   const [slots, setSlotsState] = useState<RouteSlotState[]>([
     {
@@ -364,6 +407,9 @@ export function useRouting(isOfflineMode: boolean) {
     new HistoryStack<RouteHistorySnapshot>(MAX_UNDO),
   ]);
   const workerRef = useRef<Worker | null>(null);
+  const workerPhaseRef = useRef<WorkerPhase>('idle');
+  const isOfflineModeRef = useRef<boolean>(isOfflineMode);
+  isOfflineModeRef.current = isOfflineMode;
   const activeSlotRouteIdRef = useRef<Array<string | null>>([null]);
   const activeImportRef = useRef<{ id: string; routeIdx: number } | null>(null);
   const pendingInspectCallbacksRef = useRef<Map<string, (info: PointWayInfo | null) => void>>(
@@ -376,15 +422,32 @@ export function useRouting(isOfflineMode: boolean) {
 
   const customProfilesRef = useRef<CustomProfileRecord[]>(customProfiles);
   customProfilesRef.current = customProfiles;
+  const draftProfileRef = useRef<CustomProfileRecord | null>(draftProfile);
+  draftProfileRef.current = draftProfile;
   const slotsRef = useRef<RouteSlotState[]>(slots);
   slotsRef.current = slots;
   const activeSlotIdxRef = useRef<number>(activeSlotIdx);
   activeSlotIdxRef.current = activeSlotIdx;
 
+  const setDraftProfile = useCallback((next: CustomProfileRecord | null) => {
+    draftProfileRef.current = next;
+    setDraftProfileState(next);
+  }, []);
+
   const getProfileMeta = useCallback(
     (profileId: ProfileName): ProfileMeta => {
       if (profileId in PROFILE_INFO) {
         return PROFILE_INFO[profileId];
+      }
+      if (draftProfile && draftProfile.id === profileId) {
+        const name = draftProfile.name.trim() || 'Custom Profile';
+        return {
+          id: profileId,
+          label: name,
+          shortLabel: name,
+          summary: draftProfile.summary || 'Custom routing profile.',
+          isCustom: true,
+        };
       }
       const found = customProfiles.find((c) => c.id === profileId);
       if (found) {
@@ -397,23 +460,27 @@ export function useRouting(isOfflineMode: boolean) {
         };
       }
       if (profileId === 'custom:__draft__') {
+        const name = draftProfile?.name?.trim() || 'Custom Profile';
         return {
           id: profileId,
-          label: 'Live Editor Draft',
-          shortLabel: 'Live Draft',
-          summary: 'Unsaved profile currently being edited.',
+          label: name,
+          shortLabel: name,
+          summary: draftProfile?.summary || 'Custom routing profile.',
           isCustom: true,
         };
       }
+      const fallbackName = profileId.startsWith('custom:')
+        ? profileId.slice('custom:'.length)
+        : profileId;
       return {
         id: profileId,
-        label: profileId,
-        shortLabel: profileId,
+        label: fallbackName,
+        shortLabel: fallbackName,
         summary: 'Custom routing profile.',
         isCustom: true,
       };
     },
-    [customProfiles],
+    [customProfiles, draftProfile],
   );
 
   const updateUndoRedo = useCallback((slotIdx = activeSlotIdxRef.current) => {
@@ -563,15 +630,20 @@ export function useRouting(isOfflineMode: boolean) {
     [postSlotRouteRequest],
   );
 
-  // Worker initialization and offline sync
-  useEffect(() => {
+  const spawnRoutingWorker = useCallback((): Worker => {
     const worker = new Worker(new URL('../worker.ts', import.meta.url), { type: 'module' });
     workerRef.current = worker;
+    workerPhaseRef.current = 'idle';
     initCompletedRef.current = false;
 
     worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
+      if (workerRef.current !== worker) return;
       const msg = e.data;
       switch (msg.type) {
+        case 'WORKER_PHASE': {
+          workerPhaseRef.current = msg.phase;
+          break;
+        }
         case 'STATUS': {
           const anyActive =
             activeImportRef.current !== null ||
@@ -749,8 +821,13 @@ export function useRouting(isOfflineMode: boolean) {
       }
     };
 
-    worker.postMessage({ type: 'SET_OFFLINE_MODE', offline: isOfflineMode } satisfies WorkerMessage);
-    worker.postMessage({ type: 'INIT' } satisfies WorkerMessage);
+    worker.postMessage({
+      type: 'SET_OFFLINE_MODE',
+      offline: isOfflineModeRef.current,
+    } satisfies WorkerMessage);
+
+    // Register custom profile DSL strings without setting msg.id so the Worker stores them in JS
+    // without instantiating WebAssembly.Memory until a route calculation actually begins.
     for (const cp of customProfilesRef.current) {
       worker.postMessage({
         type: 'LOAD_CUSTOM_PROFILE',
@@ -758,6 +835,123 @@ export function useRouting(isOfflineMode: boolean) {
         content: cp.dsl,
       } satisfies WorkerMessage);
     }
+    const draft = draftProfileRef.current;
+    if (draft && !customProfilesRef.current.some((cp) => cp.id === draft.id)) {
+      worker.postMessage({
+        type: 'LOAD_CUSTOM_PROFILE',
+        name: draft.id,
+        content: draft.dsl,
+      } satisfies WorkerMessage);
+    }
+
+    if (cachedWasmModule) {
+      worker.postMessage({ type: 'INIT', wasmModule: cachedWasmModule } satisfies WorkerMessage);
+    } else {
+      void getSharedWasmModule().then((wasmModule) => {
+        if (workerRef.current === worker) {
+          worker.postMessage({ type: 'INIT', wasmModule } satisfies WorkerMessage);
+        }
+      });
+    }
+
+    return worker;
+  }, [postSlotRouteRequest, saveToUrlAndStorage, updateUndoRedo]);
+
+  /**
+   * Aborts an in-flight route search for `profileId` by terminating the blocked Web Worker and
+   * respawning a clean idle Worker.
+   *
+   * Why termination is required:
+   * `WasmRouter::route()` runs synchronously inside the Worker. Cross-origin isolation headers
+   * (COOP/COEP) are disabled so MapLibre can load external map tiles, which means `SharedArrayBuffer`
+   * atomic cancellation flags are unavailable. `worker.terminate()` is the only way to stop an
+   * expensive 6-19s A* search mid-flight instead of queueing stale searches behind it.
+   *
+   * Memory safeguards enforced here and in `ProfileEditorPanel`:
+   * 1. Timing separation (no 2x WASM heap overlap): `oldWorker.terminate()` runs immediately at
+   *    `t = 0 ms` when the user touches a control, while the respawned Worker stays idle (`0 bytes`
+   *    of `WebAssembly.Memory`) until the `600 ms` editor pause debounce expires. This gives the
+   *    browser and OS time to unmap the old 500-800 MB WASM linear heap before allocating a new one.
+   * 2. Shared `WebAssembly.Module`: `spawnRoutingWorker()` passes `cachedWasmModule` via `INIT` so
+   *    respawned Workers instantiate pre-compiled machine code without recompiling `.wasm` JIT pages.
+   * 3. Download safety and listener cleanup: never terminates while `.rd5` segments are downloading
+   *    (`workerPhase === 'downloading'`) or during GPX import (`activeImportRef !== null`). Detaches
+   *    `onmessage`/`onerror` and resolves pending `inspectPoint` callbacks so closures cannot leak.
+   */
+  const abortInFlightProfileRoute = useCallback(
+    (profileId: ProfileName): boolean => {
+      const oldWorker = workerRef.current;
+      if (!oldWorker) return false;
+
+      const hasInFlightForProfile = slotsRef.current.some(
+        (s, idx) => s.profile === profileId && activeSlotRouteIdRef.current[idx] !== null,
+      );
+      if (!hasInFlightForProfile) return false;
+
+      // Safeguard 3: never interrupt an active .rd5 segment download or GPX track import.
+      if (workerPhaseRef.current === 'downloading' || activeImportRef.current !== null) {
+        return false;
+      }
+
+      const otherInFlightSlotIndices: number[] = [];
+      slotsRef.current.forEach((s, idx) => {
+        if (activeSlotRouteIdRef.current[idx] !== null) {
+          if (s.profile === profileId) {
+            activeSlotRouteIdRef.current[idx] = null;
+          } else {
+            otherInFlightSlotIndices.push(idx);
+          }
+        }
+      });
+
+      // Safeguard 3: detach main-thread closures and flush pending point-inspect Promises.
+      oldWorker.onmessage = null;
+      oldWorker.onerror = null;
+      oldWorker.terminate();
+      workerRef.current = null;
+      workerPhaseRef.current = 'idle';
+
+      if (pendingInspectCallbacksRef.current.size > 0) {
+        for (const resolve of pendingInspectCallbacksRef.current.values()) {
+          resolve(null);
+        }
+        pendingInspectCallbacksRef.current.clear();
+      }
+
+      const nextSlots = slotsRef.current.map((s) =>
+        s.profile === profileId && s.isRouting ? { ...s, isRouting: false } : s,
+      );
+      slotsRef.current = nextSlots;
+      setSlotsState(nextSlots);
+
+      spawnRoutingWorker();
+
+      if (otherInFlightSlotIndices.length > 0) {
+        for (const idx of otherInFlightSlotIndices) {
+          const slot = nextSlots[idx];
+          if (slot && slot.waypoints.length >= 2) {
+            postSlotRouteRequest(
+              idx,
+              slot.waypoints,
+              slot.profile,
+              slot.avoidAreas,
+              requestedSlotAltRef.current[idx] ?? slot.alternativeIdx,
+            );
+          }
+        }
+      } else {
+        setIsError(false);
+        setStatus('');
+      }
+
+      return true;
+    },
+    [postSlotRouteRequest, spawnRoutingWorker],
+  );
+
+  // Worker initialization and initial route load
+  useEffect(() => {
+    spawnRoutingWorker();
 
     // Initial load from Hash or LocalStorage
     const fromLink = /(?:^#|&)(?:r|r2|r3|nogos|nogos2|nogos3|p|p2|p3)=/.test(location.hash);
@@ -875,8 +1069,12 @@ export function useRouting(isOfflineMode: boolean) {
 
     return () => {
       window.removeEventListener('hashchange', onHashChange);
-      worker.terminate();
-      workerRef.current = null;
+      if (workerRef.current) {
+        workerRef.current.onmessage = null;
+        workerRef.current.onerror = null;
+        workerRef.current.terminate();
+        workerRef.current = null;
+      }
     };
   }, []);
 
@@ -1003,12 +1201,22 @@ export function useRouting(isOfflineMode: boolean) {
   );
 
   const setSlotProfile = useCallback(
-    (slotIdx: number, nextProfile: ProfileName) => {
+    (slotIdx: number, nextProfile: ProfileName, recompute = true) => {
       if (slotIdx < 0 || slotIdx >= slotsRef.current.length) return;
-      requestedSlotAltRef.current[slotIdx] = 0;
-      shownSlotAltRef.current[slotIdx] = 0;
       const targetSlot = slotsRef.current[slotIdx];
       const hasWps = targetSlot.waypoints.length >= 2;
+      if (!recompute) {
+        activeSlotRouteIdRef.current[slotIdx] = null;
+        const nextSlots = slotsRef.current.map((s, idx) =>
+          idx === slotIdx ? { ...s, profile: nextProfile, isRouting: false } : s,
+        );
+        slotsRef.current = nextSlots;
+        setSlotsState(nextSlots);
+        saveToUrlAndStorage(nextSlots, activeSlotIdxRef.current);
+        return;
+      }
+      requestedSlotAltRef.current[slotIdx] = 0;
+      shownSlotAltRef.current[slotIdx] = 0;
       const nextSlots = slotsRef.current.map((s, idx) =>
         idx === slotIdx
           ? { ...s, profile: nextProfile, alternativeIdx: 0, isRouting: hasWps }
@@ -1663,8 +1871,11 @@ export function useRouting(isOfflineMode: boolean) {
   const updateCustomProfileDsl = useCallback(
     (profileId: ProfileName, content: string, recomputeActiveSlots = true) => {
       if (!workerRef.current) return;
+      // Include `id` when recomputing so a freshly respawned Worker parses and validates the
+      // `.brf` script immediately via `CUSTOM_PROFILE_LOADED` instead of deferring parse errors.
       workerRef.current.postMessage({
         type: 'LOAD_CUSTOM_PROFILE',
+        id: recomputeActiveSlots ? String(++routeCounterRef.current) : undefined,
         name: profileId,
         content,
       } satisfies WorkerMessage);
@@ -1701,7 +1912,7 @@ export function useRouting(isOfflineMode: boolean) {
   );
 
   const saveCustomProfile = useCallback(
-    (record: CustomProfileRecord) => {
+    (record: CustomProfileRecord, recompute = true) => {
       setCustomProfiles((prev) => {
         const exists = prev.some((c) => c.id === record.id);
         const next = exists
@@ -1711,7 +1922,18 @@ export function useRouting(isOfflineMode: boolean) {
         saveCustomProfilesToStorage(next);
         return next;
       });
-      updateCustomProfileDsl(record.id, record.dsl, true);
+      draftProfileRef.current = record;
+      setDraftProfileState(record);
+      updateCustomProfileDsl(record.id, record.dsl, recompute);
+      if (
+        record.id !== 'custom:__draft__' &&
+        !slotsRef.current.some((s) => s.profile === 'custom:__draft__')
+      ) {
+        workerRef.current?.postMessage({
+          type: 'REMOVE_CUSTOM_PROFILE',
+          name: 'custom:__draft__',
+        } satisfies WorkerMessage);
+      }
     },
     [updateCustomProfileDsl],
   );
@@ -1724,6 +1946,14 @@ export function useRouting(isOfflineMode: boolean) {
         saveCustomProfilesToStorage(next);
         return next;
       });
+      if (draftProfileRef.current?.id === profileId) {
+        draftProfileRef.current = null;
+        setDraftProfileState(null);
+      }
+      workerRef.current?.postMessage({
+        type: 'REMOVE_CUSTOM_PROFILE',
+        name: profileId,
+      } satisfies WorkerMessage);
       const currentSlots = slotsRef.current;
       if (currentSlots.some((s) => s.profile === profileId)) {
         const fallback = PROFILE_ORDER[0];
@@ -1779,9 +2009,12 @@ export function useRouting(isOfflineMode: boolean) {
     setSlotColor,
     selectSlotAlternative,
     customProfiles,
+    draftProfile,
+    setDraftProfile,
     customProfileError,
     getProfileMeta,
     updateCustomProfileDsl,
+    abortInFlightProfileRoute,
     saveCustomProfile,
     deleteCustomProfile,
     profile: activeSlot.profile,

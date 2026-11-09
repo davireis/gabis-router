@@ -29,11 +29,13 @@ const WASM_PATH = path.resolve(import.meta.dirname, '../src/pkg/rsrouter_wasm_bg
 const HAS_RD5_DATA = fs.existsSync(path.join(SEGMENTS_DIR, 'W5_N50.rd5'));
 
 let sharedRouter: WasmRouter | null = null;
+let wasmMemory: WebAssembly.Memory | null = null;
 
 async function getRouter(): Promise<WasmRouter> {
   if (sharedRouter) return sharedRouter;
 
-  await initWasm({ module_or_path: fs.readFileSync(WASM_PATH) });
+  const wasmOut = await initWasm({ module_or_path: fs.readFileSync(WASM_PATH) });
+  wasmMemory = wasmOut.memory;
   const router = new WasmRouter();
   router.set_segment_reader(
     (name: string) => {
@@ -260,5 +262,42 @@ test(
       const tunnels = steps.filter(isMotorRoadTunnel);
       assert.equal(sumMeters(tunnels), 0, formatSteps(tunnels));
     });
+  },
+);
+
+test(
+  'Repeated custom profile edits evict stale cost tables and keep WASM memory bounded',
+  { skip: !HAS_RD5_DATA },
+  async () => {
+    const router = await getRouter();
+    const wpStr = `${TOOTING_BROADWAY.lon},${TOOTING_BROADWAY.lat}|${WIMBLEDON.lon},${WIMBLEDON.lat}`;
+
+    const warmupBrf = generateBrfFromAxes(TEMPLATE_PRESETS['gabis-safe-road'].axes, {
+      name: 'Safe Road Custom',
+    });
+    router.load_profile('custom:__draft__', warmupBrf);
+    router.route(wpStr, 'custom:__draft__', 0, undefined);
+
+    const baselineBytes = wasmMemory!.buffer.byteLength;
+    assert.ok(router.description_count() > 1000, 'Expected interned way descriptions after routing');
+
+    for (let i = 1; i <= 15; i++) {
+      const axes: ProfileAxes = {
+        ...TEMPLATE_PRESETS['gabis-safe-road'].axes,
+        primaryCost: Number((0.2 + i * 0.1).toFixed(2)),
+        forestUntaggedPenalty: Number((0.1 + i * 0.05).toFixed(2)),
+      };
+      const brf = generateBrfFromAxes(axes, { name: 'Safe Road Custom' });
+      router.load_profile('custom:__draft__', brf);
+      router.route(wpStr, 'custom:__draft__', 0, undefined);
+    }
+
+    const afterBytes = wasmMemory!.buffer.byteLength;
+    const growthMb = (afterBytes - baselineBytes) / (1024 * 1024);
+    assert.ok(
+      growthMb <= 16,
+      `Expected WASM memory growth <= 16 MB across 15 profile reloads, got ${growthMb.toFixed(2)} MB`,
+    );
+    router.remove_profile('custom:__draft__');
   },
 );

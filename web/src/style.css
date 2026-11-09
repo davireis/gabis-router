@@ -996,7 +996,7 @@ body,
 
 .wp-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
   position: relative;
   transition: opacity 0.12s;
@@ -1035,7 +1035,7 @@ body,
   align-items: center;
   justify-content: center;
   width: 11px;
-  height: 24px;
+  height: 29px;
   color: var(--muted);
   cursor: grab;
   user-select: none;
@@ -1063,20 +1063,22 @@ body,
 .wp-rail-col {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  align-self: stretch;
   width: 21px;
-  height: 28px;
+  min-height: 29px;
+  padding-top: 4.5px;
   flex-shrink: 0;
 }
 
 .wp-rail-dots {
   position: absolute;
   top: 24px;
+  bottom: -5px;
   left: 50%;
   transform: translateX(-50%);
   width: 0;
-  height: 9px;
   border-left: 2px dotted var(--muted);
   opacity: 0.6;
   pointer-events: none;
@@ -1149,9 +1151,16 @@ body,
   pointer-events: none;
 }
 
+.wp-input-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .wp-input-pill {
   position: relative;
-  flex: 1;
+  width: 100%;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -1219,9 +1228,11 @@ body,
 }
 
 .wp-row-dropdown {
-  top: calc(100% + 3px);
-  left: 0;
-  right: 0;
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+  margin-top: 3px;
 }
 
 .wp-UseLocation-item {
@@ -3522,45 +3533,6 @@ body,
 }
 
 .pe-close-label {
-  display: none;
-}
-
-.pe-live-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.63rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: #ecfdf5;
-  color: #059669;
-  border: 1px solid #a7f3d0;
-}
-
-.pe-live-pill::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #10b981;
-}
-
-:root[data-theme="dark"] .pe-live-pill {
-  background: rgba(16, 185, 129, 0.16);
-  color: #34d399;
-  border-color: rgba(52, 211, 153, 0.3);
-}
-
-.pe-live-pill.is-routing {
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-color: rgba(37, 99, 235, 0.28);
-}
-
-.pe-live-pill.is-routing::before {
   display: none;
 }
 

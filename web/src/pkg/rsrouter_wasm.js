@@ -18,6 +18,14 @@ export class WasmRouter {
         wasm.wasmrouter_clear_graph(this.__wbg_ptr);
     }
     /**
+     * Returns the number of interned way and node descriptions currently held in the graph.
+     * @returns {number}
+     */
+    description_count() {
+        const ret = wasm.wasmrouter_description_count(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
      * Returns the number of edges currently loaded in the graph.
      * @returns {number}
      */
@@ -64,7 +72,7 @@ export class WasmRouter {
         }
     }
     /**
-     * Loads a BRouter profile (.brf) text.
+     * Loads a BRouter profile (.brf) text and evicts any superseded profile cost tables.
      * @param {string} name
      * @param {string} content
      */
@@ -130,6 +138,15 @@ export class WasmRouter {
     node_count() {
         const ret = wasm.wasmrouter_node_count(this.__wbg_ptr);
         return ret >>> 0;
+    }
+    /**
+     * Removes a loaded profile by name and evicts its cached cost table if unused.
+     * @param {string} name
+     */
+    remove_profile(name) {
+        const ptr0 = passStringToWasm0(name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.wasmrouter_remove_profile(this.__wbg_ptr, ptr0, len0);
     }
     /**
      * Computes a route for given waypoints ("lon,lat|lon,lat") and returns a GeoJSON string.

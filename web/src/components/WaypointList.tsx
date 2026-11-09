@@ -213,6 +213,7 @@ export const WaypointList: React.FC<WaypointListProps> = ({
   useEffect(() => {
     if (activeRowIdx !== null && activeInputRef.current) {
       activeInputRef.current.focus();
+      activeInputRef.current.closest('.wp-row')?.scrollIntoView({ block: 'nearest' });
     }
   }, [activeRowIdx]);
 
@@ -400,6 +401,9 @@ export const WaypointList: React.FC<WaypointListProps> = ({
     setResults([]);
     setSearchStatus('');
   };
+
+  const applyWaypointForRowRef = useRef(applyWaypointForRow);
+  applyWaypointForRowRef.current = applyWaypointForRow;
 
   const handleSelectPlace = (rowIdx: number, place: GeocodePlace) => {
     applyWaypointForRow(rowIdx, {
@@ -618,11 +622,12 @@ export const WaypointList: React.FC<WaypointListProps> = ({
             rowClass += dropTarget.isAbove ? ' drop-above' : ' drop-below';
           }
 
+          const canOfferMyLocation =
+            Boolean(onUseMyLocationAt) && (!hasTyped || inputValue.trim().length === 0);
+          const showInlineLocateBtn =
+            Boolean(onUseMyLocationAt) && (isActive ? inputValue.trim().length === 0 : !w);
           const showDropdown =
-            isActive &&
-            (results.length > 0 ||
-              Boolean(searchStatus) ||
-              (!hasTyped && Boolean(onUseMyLocationAt) && !w));
+            isActive && (results.length > 0 || Boolean(searchStatus) || canOfferMyLocation);
 
           return (
             <div
@@ -663,87 +668,92 @@ export const WaypointList: React.FC<WaypointListProps> = ({
                 {rIdx < rows.length - 1 && <span className="wp-rail-dots" aria-hidden="true" />}
               </div>
 
-              <div className={`wp-input-pill ${isActive ? 'is-focused' : ''}`}>
-                {isRowGeocoding && !isActive ? (
-                  <div
-                    className="wp-loading-placeholder"
-                    title={`Looking up address for ${coordStr}`}
-                    onClick={() => handleFocusRow(rIdx)}
-                  >
-                    <span className="wp-loading-shimmer" />
-                  </div>
-                ) : (
-                  <input
-                    ref={isActive ? activeInputRef : undefined}
-                    id={rIdx === 0 ? 'input-place-search' : undefined}
-                    type="text"
-                    className="wp-pill-input"
-                    value={isActive ? inputValue : displayName}
-                    placeholder={row.placeholder}
-                    autoComplete="off"
-                    onFocus={() => handleFocusRow(rIdx)}
-                    onChange={(e) => {
-                      if (!isActive) setActiveRowIdx(rIdx);
-                      setInputValue(e.target.value);
-                      setHasTyped(true);
-                    }}
-                    onKeyDown={(e) => handleRowKeyDown(e, rIdx)}
-                  />
-                )}
+              <div className="wp-input-col">
+                <div className={`wp-input-pill ${isActive ? 'is-focused' : ''}`}>
+                  {isRowGeocoding && !isActive ? (
+                    <div
+                      className="wp-loading-placeholder"
+                      title={`Looking up address for ${coordStr}`}
+                      onClick={() => handleFocusRow(rIdx)}
+                    >
+                      <span className="wp-loading-shimmer" />
+                    </div>
+                  ) : (
+                    <input
+                      ref={isActive ? activeInputRef : undefined}
+                      id={rIdx === 0 ? 'input-place-search' : undefined}
+                      type="text"
+                      className="wp-pill-input"
+                      value={isActive ? inputValue : displayName}
+                      placeholder={row.placeholder}
+                      autoComplete="off"
+                      onFocus={() => handleFocusRow(rIdx)}
+                      onChange={(e) => {
+                        if (!isActive) setActiveRowIdx(rIdx);
+                        setInputValue(e.target.value);
+                        setHasTyped(e.target.value.trim().length > 0);
+                      }}
+                      onKeyDown={(e) => handleRowKeyDown(e, rIdx)}
+                    />
+                  )}
 
-                {!w && !isActive && onUseMyLocationAt && rIdx === 0 && (
-                  <button
-                    id="btn-my-location"
-                    type="button"
-                    className="wp-pill-action-btn"
-                    title="Use my current location"
-                    aria-label="Use my current location"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onUseMyLocationAt((pt) => applyWaypointForRow(rIdx, pt));
-                    }}
-                  >
-                    <Icon name="locate" size={14} />
-                  </button>
-                )}
+                  {showInlineLocateBtn && onUseMyLocationAt && (
+                    <button
+                      id={rIdx === 0 ? 'btn-my-location' : `btn-my-location-${rIdx}`}
+                      type="button"
+                      className="wp-pill-action-btn"
+                      title="Use my current location"
+                      aria-label="Use my current location"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUseMyLocationAt((pt) => applyWaypointForRowRef.current(rIdx, pt));
+                      }}
+                    >
+                      <Icon name="locate" size={14} />
+                    </button>
+                  )}
 
-                {(w || (isActive && inputValue.length > 0) || (isAddingStop && rIdx === rows.length - 1)) && (
-                  <button
-                    type="button"
-                    className="wp-pill-action-btn wp-pill-clear-btn"
-                    title={isActive && hasTyped ? 'Clear text' : 'Remove waypoint'}
-                    aria-label={isActive && hasTyped ? 'Clear text' : 'Remove waypoint'}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (isActive && hasTyped && inputValue.length > 0) {
-                        setInputValue('');
-                        setResults([]);
-                        setSearchStatus('');
-                        activeInputRef.current?.focus();
-                      } else if (wpIdx !== null) {
-                        setActiveRowIdx(null);
-                        setHasTyped(false);
-                        onRemove(wpIdx);
-                      } else if (isAddingStop && rIdx === rows.length - 1) {
-                        setIsAddingStop(false);
-                        setActiveRowIdx(null);
-                      }
-                    }}
-                  >
-                    <Icon name="close" size={13} />
-                  </button>
-                )}
+                  {(w || (isActive && inputValue.length > 0) || (isAddingStop && rIdx === rows.length - 1)) && (
+                    <button
+                      type="button"
+                      className="wp-pill-action-btn wp-pill-clear-btn"
+                      title={isActive && hasTyped ? 'Clear text' : 'Remove waypoint'}
+                      aria-label={isActive && hasTyped ? 'Clear text' : 'Remove waypoint'}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isActive && hasTyped && inputValue.length > 0) {
+                          setInputValue('');
+                          setHasTyped(false);
+                          setResults([]);
+                          setSearchStatus('');
+                          activeInputRef.current?.focus();
+                        } else if (wpIdx !== null) {
+                          setActiveRowIdx(null);
+                          setHasTyped(false);
+                          onRemove(wpIdx);
+                        } else if (isAddingStop && rIdx === rows.length - 1) {
+                          setIsAddingStop(false);
+                          setActiveRowIdx(null);
+                        }
+                      }}
+                    >
+                      <Icon name="close" size={13} />
+                    </button>
+                  )}
+                </div>
 
                 {showDropdown && (
                   <div id="search-results-list" className="search-results wp-row-dropdown" role="listbox">
-                    {!hasTyped && onUseMyLocationAt && (
+                    {canOfferMyLocation && onUseMyLocationAt && (
                       <div
                         role="option"
                         aria-selected={false}
                         className="search-item wp-UseLocation-item"
                         onMouseDown={(e) => {
                           e.preventDefault();
-                          onUseMyLocationAt((pt) => applyWaypointForRow(rIdx, pt));
+                          onUseMyLocationAt((pt) => applyWaypointForRowRef.current(rIdx, pt));
                         }}
                       >
                         <Icon name="locate" size={14} className="wp-loc-opt-icon" />

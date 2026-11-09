@@ -188,9 +188,13 @@ export interface PointWayInfo {
   sidewalk?: boolean;
 }
 
+export type WorkerPhase = 'idle' | 'downloading' | 'calculating';
+
 export type WorkerMessage =
-  | { type: 'INIT' }
+  | { type: 'INIT'; wasmModule?: WebAssembly.Module }
+  | { type: 'WORKER_PHASE'; phase: WorkerPhase }
   | { type: 'LOAD_CUSTOM_PROFILE'; id?: string; name: string; content: string }
+  | { type: 'REMOVE_CUSTOM_PROFILE'; name: string }
   | { type: 'CUSTOM_PROFILE_LOADED'; id?: string; name: string; ok: boolean; error?: string }
   | { type: 'ROUTE_REQUEST'; id: string; slotIdx?: number; payload: RouteRequest }
   | { type: 'ROUTE_SUCCESS'; id: string; slotIdx?: number; payload: RouteResponse }

@@ -54,12 +54,13 @@ test('generateBrfFromAxes reflects OSM highway and surface slider changes', () =
   assert.ok(brf.includes('and highway=trunk|trunk_link'));
 });
 
-test('normalizeProfileAxes fills missing fields from template defaults and migrates legacy busyCrossingCost', () => {
+test('normalizeProfileAxes fills missing fields from template defaults and migrates legacy busyCrossingCost and noForestPenalty', () => {
   const partial = {
     primaryCost: 1.4,
     cyclewaySharedCost: 15,
     cobblestonePenalty: 0.5,
     busyCrossingCost: 100,
+    noForestPenalty: 2.0,
   } as any;
   const norm = normalizeProfileAxes(partial, 'gabis-safe-road');
   assert.equal(norm.primaryCost, 1.4);
@@ -70,6 +71,11 @@ test('normalizeProfileAxes fills missing fields from template defaults and migra
   assert.equal(norm.crossingClass1Cost, 15);
   assert.equal(norm.crossingClass3Cost, 50);
   assert.equal(norm.crossingClass6Cost, 100);
+  assert.equal(norm.enableForestPenalties, true);
+  assert.equal(norm.forestUntaggedPenalty, 2.0);
+  assert.equal(norm.forestClass1Penalty, 1.0);
+  assert.equal(norm.forestClass3Penalty, 0.5);
+  assert.equal(norm.forestClass6Penalty, 0.0);
 });
 
 test('generateBrfFromAxes supports 10000 disallow values, surface subclasses, uncertain/untagged penalties, and additive costfactor starting from 1.0', () => {
@@ -98,7 +104,10 @@ test('generateBrfFromAxes supports 10000 disallow values, surface subclasses, un
   base.untaggedLitPenalty = 0.4;
   base.trafficClass7Penalty = 2.7;
   base.noiseClass5Penalty = 0.7;
-  base.noForestPenalty = 1.5;
+  base.enableForestPenalties = true;
+  base.forestUntaggedPenalty = 6.5;
+  base.forestClass3Penalty = 3.2;
+  base.forestClass6Penalty = 0.0;
   base.stopGiveWayCost = 25;
   base.crossingClass3Cost = 55;
   base.crossingClass5Cost = 10000;
@@ -148,6 +157,8 @@ test('generateBrfFromAxes supports 10000 disallow values, surface subclasses, un
     ),
   );
   assert.ok(brf.includes('switch estimated_noise_class=5  0.7'));
+  assert.ok(brf.includes('switch estimated_forest_class=   6.5'));
+  assert.ok(brf.includes('switch estimated_forest_class=3  3.2'));
   assert.ok(brf.includes('if lanes=3|4|5|6|7|8 then 1.2'));
   assert.ok(brf.includes('if lit=no then 2'));
   assert.ok(brf.includes('else if lit= then 0.4'));
@@ -159,6 +170,7 @@ test('generateBrfFromAxes disables entire sections when section switches are fal
     enableSurfacePenalties: false,
     enableTrafficPenalties: false,
     enableNoisePenalties: false,
+    enableForestPenalties: false,
     enableEnvironmentPenalties: false,
     considerElevation: false,
     enableTurnPenalties: false,
