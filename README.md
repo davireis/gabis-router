@@ -1,69 +1,45 @@
-# gabis-router
+# Gabi's Router
 
-Bicycle route planner and offline-capable web application (**Gabi's Router**) powered by [`brouter-rs`](subrepos/brouter-rs).
+<p align="center">
+  <img src="web/public/logo.png" width="110" alt="Gabi's Router logo" />
+</p>
 
-## Project Structure
+Gabi's Router is a customizable cycling route planner powered by [BRouter](https://brouter.de) and [`brouter-rs`](https://github.com/gabisurita/brouter-rs). It runs in your browser via WebAssembly and works offline. It is fully free, private, and open-source, with no accounts or tracking. Try it at [router.surita.dev](https://router.surita.dev).
 
-| Component | Path | Description |
-| :--- | :--- | :--- |
-| `brouter-rs` | `subrepos/brouter-rs/` | Core BRouter engine in Rust (RD5 decoding, profile DSL, 2-pass guided A* search, HTTP server demo, and parity benchmarks). See [subrepos/brouter-rs/README.md](subrepos/brouter-rs/README.md) |
-| `route-tools` | `crates/route-tools/` | Product routing utilities: GPX / GPS track map-matching, minimal waypoint extraction, and surface/road segment breakdowns |
-| `rsrouter-wasm` | `crates/rsrouter-wasm/` | WebAssembly bindings for browser routing and GPX waypoint extraction |
-| `profiles` | `profiles/` | Custom product `.brf` profiles (`gabis-*`) and standard BRouter profiles |
-| `web` | `web/` | Argon + MapLibre PWA frontend. See [web/README.md](web/README.md) |
-| `tools` | `tools/` | Data updater, PMTiles extractor, and Frontend MCP server (`mcp-frontend.mjs`). See [tools/README.md](tools/README.md) |
+> [!WARNING]
+> This project is highly experimental. Routes are generated from OpenStreetMap data and may contain errors, closed paths, or unsafe roads. Always check road signs and conditions on the ground.
+
+## What It Does
+
+| Capability | Description |
+| :--- | :--- |
+| Custom routing | Score every road by surface, traffic, speed limit, noise, hills, and road class. |
+| Side-by-side comparison | Compare up to three routing profiles or independent routes on the map at once. |
+| Surface and road breakdown | Inspect distance shares for surfaces, road types, traffic levels, noise, and route warnings. |
+| Offline mode | Download routing segments and vector map tiles once to plan routes without internet access. |
+| GPX import and export | Import existing GPX tracks to match onto the road network, or export planned rides to GPX. |
 
 ## Quick Start
 
-### Build and Test
-
-Run product tests (`route-tools` and `rsrouter-wasm`):
+Build the WebAssembly bindings and start the web app:
 
 ```bash
-cargo test
-```
-
-Run `brouter-rs` core and parity tests:
-
-```bash
-cargo test --manifest-path subrepos/brouter-rs/Cargo.toml
-```
-
-### Build WebAssembly Bindings and Run Frontend
-
-```bash
+npm --prefix web install
 npm --prefix web run build:wasm
 npm --prefix web run dev
 ```
 
-### Run BRouter Server Demo and Parity Tools
+Run tests:
 
 ```bash
-# Run HTTP server (same API as BRouter) on port 17777
-cargo run --release --manifest-path subrepos/brouter-rs/Cargo.toml --example server
-
-# Run parity checks
-cargo run --release --manifest-path subrepos/brouter-rs/Cargo.toml --example compare_routes
-
-# Generate interactive route comparison map (routes_comparison.html)
-cargo run --release --manifest-path subrepos/brouter-rs/Cargo.toml --example plot_routes
+cargo test
+npm --prefix web test
 ```
 
-### Update Data and Fixtures
+## Documentation
 
-Download the latest official BRouter `.rd5` segments and refresh parity test fixtures:
-
-```bash
-python3 tools/update_data.py --update-tests --check
-```
-
-## Pre-Launch Checklist
-
-Items to revisit before public release or commercial deployment:
-
-| Area | Current State | Production Requirement |
-| :--- | :--- | :--- |
-| Basemap API Keys | Thunderforest key hardcoded in client bundle | Use a backend tile proxy or require user-supplied keys to avoid quota depletion |
-| Tile Usage Limits | Free tier on Thunderforest: 150,000 tiles per month, public CyclOSM | Verify commercial license and tile caching compliance under production traffic |
-| Tile and Routing Data CDN | Local files and test mirrors | Set up a production CDN with cache-control headers for `.rd5` and `.pmtiles` archives |
-| Error and Usage Telemetry | Local console error filtering only | Establish privacy-respecting error tracking with user opt-in |
+| Guide | Contents |
+| :--- | :--- |
+| [web/README.md](web/README.md) | Web app setup and frontend structure. |
+| [`brouter-rs`](https://github.com/gabisurita/brouter-rs) | Core Rust routing engine and CLI tools. |
+| [tools/README.md](tools/README.md) | Data scripts and development tools. |
