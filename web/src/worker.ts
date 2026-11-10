@@ -14,7 +14,7 @@ import {
 const MAX_CACHED_CELLS = 2500;
 const MAX_CACHED_DESCRIPTIONS = 250_000;
 const CANCELLED_ERR = '__CANCELLED__';
-const UK_SEGMENT_SET = new Set<string>(UK_SEGMENTS);
+const UK_SEGMENT_SET = new Set<string>([...UK_SEGMENTS, 'W50_S25']);
 
 let router: WasmRouter | null = null;
 // Safeguard 2 (Shared WebAssembly.Module):

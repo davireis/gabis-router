@@ -21,6 +21,7 @@ const UK_SEGMENTS: &[(&str, i32, i32)] = &[
     ("W5_N55", -5, 55),
     ("W5_N60", -5, 60),
     ("E0_N50", 0, 50),
+    ("W50_S25", -50, -25),
 ];
 
 const MIN_ZOOM: u8 = 5;
@@ -698,8 +699,8 @@ fn main() -> io::Result<()> {
     header[99] = 1; // tile_type = Mvt (1)
     header[100] = MIN_ZOOM;
     header[101] = MAX_ZOOM;
-    header[102..106].copy_from_slice(&(-150_000_000i32).to_le_bytes()); // minLon = -15.0
-    header[106..110].copy_from_slice(&(500_000_000i32).to_le_bytes()); // minLat = 50.0
+    header[102..106].copy_from_slice(&(-500_000_000i32).to_le_bytes()); // minLon = -50.0
+    header[106..110].copy_from_slice(&(-250_000_000i32).to_le_bytes()); // minLat = -25.0
     header[110..114].copy_from_slice(&(50_000_000i32).to_le_bytes()); // maxLon = 5.0
     header[114..118].copy_from_slice(&(650_000_000i32).to_le_bytes()); // maxLat = 65.0
     header[118] = 6; // centerZoom = 6

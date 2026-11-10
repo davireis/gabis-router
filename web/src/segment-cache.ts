@@ -29,6 +29,7 @@ const UK_SEGMENT_BOUNDS: ReadonlyArray<readonly [string, number, number, number,
   ['W10_N55', -10, 55, -5, 60],
   ['W15_N50', -15, 50, -10, 55],
   ['W5_N60', -5, 60, 0, 65],
+  ['W50_S25', -50, -25, -45, -20],
 ];
 
 /**
