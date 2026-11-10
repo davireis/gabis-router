@@ -1,6 +1,6 @@
-# rsrouter
+# gabis-router
 
-Bicycle route planner and offline-capable web application powered by [`brouter-rs`](subrepos/brouter-rs).
+Bicycle route planner and offline-capable web application (**Gabi's Router**) powered by [`brouter-rs`](subrepos/brouter-rs).
 
 ## Project Structure
 

@@ -1105,7 +1105,7 @@ export const MapView: React.FC<MapViewProps> = ({
         el.className = `warning-map-marker warning-kind-${w.kind} ${w.isProhibition ? 'is-prohibition' : 'is-warning'}`;
         el.style.setProperty('--warn-color', w.color);
         el.title = `${meta.label} (${kmStr}): ${w.detail} (${formatDistance(w.distanceM)})`;
-        el.innerHTML = warningKindSvg(w.kind, 12);
+        el.innerHTML = `<span class="warning-map-marker-inner">${warningKindSvg(w.kind, 12)}</span>`;
 
         const highlightObj: SegmentHighlight | null =
           w.coordinates.length >= 2

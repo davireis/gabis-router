@@ -30,10 +30,10 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
         <div className="about-header">
           <div className="about-header-text">
             <h2 id="about-title">
-              <span className="header-logo" aria-hidden="true">
-                <Icon name="bike" size={17} />
+              <span className="header-logo about-logo" aria-hidden="true">
+                <img src="/logo.png" alt="" className="header-logo-img" />
               </span>
-              <span>GBRouter</span>
+              <span className="header-brand-text">Gabi&apos;s Router</span>
             </h2>
             <p>Bike routing on your terms.</p>
           </div>
@@ -49,9 +49,9 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
         </div>
         <div className="about-body">
           <div>
-            <h3>Why GBRouter exists</h3>
+            <h3>Why Gabi&apos;s Router exists</h3>
             <p>
-              GBRouter is built by cycling nerds, for cycling nerds. It is made for people who care about how a route
+              Gabi&apos;s Router is built by cycling nerds, for cycling nerds. It is made for people who care about how a route
               feels. Most route planners treat you like someone who just wants to get from A to B. They hide the map data
               and make decisions for you.
             </p>
@@ -71,7 +71,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
               .
             </p>
             <p style={{ marginTop: '8px' }}>
-              GBRouter brings the BRouter engine directly into your browser using WebAssembly. There is no separate
+              Gabi&apos;s Router brings the BRouter engine directly into your browser using WebAssembly. There is no separate
               server to run. It also puts the nerdy details at the centre: surfaces, road types, traffic, speed limits,
               and noise estimates. It is designed for cyclists who want to tweak their route until it feels right.
             </p>
@@ -84,7 +84,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
               queries. Download the routing data and map files once, and the whole thing works in airplane mode or out in
               the hills with zero phone reception.
             </p>
-            <p style={{ marginTop: '6px', fontWeight: 500 }}>GBRouter is open source and free forever.</p>
+            <p style={{ marginTop: '6px', fontWeight: 500 }}>Gabi&apos;s Router is open source and free forever.</p>
           </div>
 
           <div>
@@ -107,7 +107,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
           <div>
             <h3>Open source credits</h3>
             <p style={{ marginBottom: '6px' }}>
-              GBRouter builds on great work by the open source mapping and cycling community:
+              Gabi&apos;s Router builds on great work by the open source mapping and cycling community:
             </p>
             <ul>
               <li>

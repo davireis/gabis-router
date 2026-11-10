@@ -541,11 +541,11 @@ export function extractRouteWarnings(
       });
     }
 
-    // Check uncontrolled high-risk road crossings (estimated_crossing_class >= 5) from a minor road or path
+    // Check uncontrolled high-risk road crossings (estimated_crossing_class >= 6) from a minor road or path
     const crossingClass = Number(node.get('estimated_crossing_class') || 0);
     const isLowPrioWay = LOW_PRIO_HIGHWAYS.has(hw) || way.get('living_street') === 'yes';
     if (
-      crossingClass >= 5 &&
+      crossingClass >= 6 &&
       isLowPrioWay &&
       node.get('highway') !== 'traffic_signals' &&
       node.get('crossing') !== 'traffic_signals'
@@ -553,10 +553,7 @@ export function extractRouteWarnings(
       const jFrom = Math.max(0, toM - Math.min(segLen, 10));
       rawWarnings.push({
         kind: 'dangerous_junction',
-        detail:
-          crossingClass >= 6
-            ? 'Uncontrolled high-speed road crossing (Class 6)'
-            : 'Uncontrolled busy road crossing (Class 5)',
+        detail: `Uncontrolled high-speed road crossing (Class ${crossingClass})`,
         from: jFrom,
         to: Math.max(jFrom + 5, toM),
         isProhibition: false,

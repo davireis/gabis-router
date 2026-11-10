@@ -1,4 +1,4 @@
-# rsrouter Web Frontend
+# Gabi's Router Web Frontend
 
 Progressive Web App (PWA) for browser-based bicycle routing powered by WebAssembly.
 

@@ -1,4 +1,4 @@
-// Map control button to show/hide the map legend for GBRouter tiles.
+// Map control button to show/hide the map legend for Gabi's Dense & Light tiles.
 
 import type maplibregl from 'maplibre-gl';
 import { getBasemap, onBasemapChange, type Basemap } from './basemap.ts';
@@ -114,7 +114,7 @@ export class LegendControl implements maplibregl.IControl {
   private renderPanel(basemap: Basemap) {
     if (!this.panel) return;
     const isDense = basemap === 'dense';
-    const title = isDense ? 'GBRouter Dense Legend' : 'GBRouter Light Legend';
+    const title = isDense ? "Gabi's Dense Legend" : "Gabi's Light Legend";
 
     this.panel.innerHTML = `
       <div class="map-legend-header">

@@ -31,7 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
   const badgeLabel = `${profileLabel || profileMeta?.shortLabel || profile}${compareCount > 0 ? ` +${compareCount}` : ''}`;
   const shortBusyLabel =
     statusMessage && /download|fetch/i.test(statusMessage)
-      ? 'Loading data…'
+      ? 'Loading…'
       : statusMessage && /init|lookup|profile/i.test(statusMessage)
         ? 'Starting…'
         : 'Routing…';
@@ -47,9 +47,9 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="header-title-wrap">
           <h1>
             <span className="header-logo" aria-hidden="true">
-              <Icon name="bike" size={16} />
+              <img src="/logo.png" alt="" className="header-logo-img" />
             </span>
-            <span>GBRouter</span>
+            <span className="header-brand-text">Gabi&apos;s Router</span>
           </h1>
           {isCollapsed && (
             <span id="header-profile-badge" className="header-profile-badge">
@@ -91,8 +91,8 @@ export const Header: React.FC<HeaderProps> = ({
             id="btn-about"
             type="button"
             className="collapse-btn"
-            title="About GBRouter"
-            aria-label="About GBRouter"
+            title="About Gabi's Router"
+            aria-label="About Gabi's Router"
             onClick={(e) => {
               e.stopPropagation();
               onOpenAbout();

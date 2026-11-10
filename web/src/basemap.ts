@@ -1,4 +1,4 @@
-// Basemap style setting: GBRouter Light (standard), GBRouter Dense, CyclOSM, or OpenCycleMap.
+// Basemap style setting: Gabi's Light (standard), Gabi's Dense, CyclOSM, or OpenCycleMap.
 
 export type Basemap = 'standard' | 'dense' | 'cyclosm' | 'opencyclemap';
 export type BasemapSetting = Basemap;

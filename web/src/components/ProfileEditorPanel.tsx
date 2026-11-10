@@ -733,14 +733,14 @@ export const ProfileEditorPanel: React.FC<ProfileEditorPanelProps> = ({ routing,
             <div className="pe-section-content">
               <div className="pe-subsection-header">
                 <span>2a. A-Roads (trunk, primary)</span>
-                <span className="pe-section-badge pe-badge-a">+0–10</span>
+                <span className="pe-section-badge pe-badge-a">+0–20</span>
               </div>
               <SliderRow
                 id="pe-trunk-cost"
                 label="Trunk (highway=trunk)"
                 value={axes.trunkCost}
                 min={0.0}
-                max={10.0}
+                max={20.0}
                 step={0.1}
                 formatValue={(v) => `+${Number(v.toFixed(1))}`}
                 disallowable

@@ -103,12 +103,12 @@ export class TilePickerControl implements maplibregl.IControl {
     const options: { id: Basemap; label: string; desc?: string; infoUrl?: string }[] = [
       {
         id: 'dense',
-        label: 'GBRouter Dense',
+        label: "Gabi's Dense",
         desc: 'Contours, hillshade, peaks & POIs [UK Only]',
       },
       {
         id: 'standard',
-        label: 'GBRouter Light',
+        label: "Gabi's Light",
         desc: 'Light tiles with cycle routes [UK Only]',
       },
       {

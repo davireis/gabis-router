@@ -1,4 +1,4 @@
-package uk.gbrouter.app;
+package dev.surita.router;
 
 import android.content.ClipData;
 import android.content.ContentValues;

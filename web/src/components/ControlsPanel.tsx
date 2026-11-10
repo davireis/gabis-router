@@ -127,12 +127,12 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
     const url = getShareableRouteUrl();
     try {
       if (typeof window !== 'undefined' && window.AndroidNative?.shareText) {
-        if (window.AndroidNative.shareText('GBRouter route', url)) {
+        if (window.AndroidNative.shareText("Gabi's Router route", url)) {
           return;
         }
       }
       if (navigator.share && (isNativePlatform() || window.matchMedia('(pointer: coarse)').matches)) {
-        await navigator.share({ title: 'GBRouter route', url });
+        await navigator.share({ title: "Gabi's Router route", url });
       } else {
         await navigator.clipboard.writeText(url);
         setShareCopied(true);

@@ -25,7 +25,7 @@ export function isDark(): boolean {
 
 function apply() {
   document.documentElement.dataset.theme = isDark() ? 'dark' : 'light';
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', isDark() ? '#0f172a' : '#1e293b');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', isDark() ? '#0b0d17' : '#151828');
   listeners.forEach((fn) => fn());
 }
 

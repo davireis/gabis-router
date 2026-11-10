@@ -1,6 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <circle cx="18.5" cy="17.5" r="3.5"/>
-  <circle cx="5.5" cy="17.5" r="3.5"/>
-  <circle cx="15" cy="5" r="1"/>
-  <path d="M12 17.5V14l-3-3 4-3 2 3h2"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="road" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="100%" stop-color="#7c6df5"/>
+    </linearGradient>
+  </defs>
+  <circle cx="32" cy="32" r="30" fill="#0b0d17" stroke="#8b92b8" stroke-width="2.5"/>
+  <circle cx="32" cy="32" r="24" fill="#151828" stroke="#4f5576" stroke-width="1.2"/>
+  <polygon points="10,40 21,23 32,40" fill="#4f5576"/>
+  <polygon points="24,40 36,21 52,40" fill="#8b92b8"/>
+  <path d="M22 50 C 26 40, 48 42, 46 31 C 45 25, 32 25, 32 19" fill="none" stroke="url(#road)" stroke-width="6.5" stroke-linecap="round"/>
+  <path d="M22 50 C 26 40, 48 42, 46 31 C 45 25, 32 25, 32 19" fill="none" stroke="#0b0d17" stroke-width="1.5" stroke-dasharray="2.5 3" stroke-linecap="round"/>
+  <path d="M32 19 C 29 15, 28 11, 32 11 C 36 11, 35 15, 32 19 Z" fill="#c084fc"/>
+  <circle cx="22" cy="38" r="6" fill="#0b0d17" stroke="#c084fc" stroke-width="2.2"/>
+  <circle cx="40" cy="38" r="6" fill="#0b0d17" stroke="#c084fc" stroke-width="2.2"/>
+  <path d="M22 38 L28 28 H38 L31 38 H22 Z M38 28 L40 38" fill="none" stroke="#f0f2ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
