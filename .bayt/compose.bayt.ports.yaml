@@ -1,0 +1,6 @@
+# generated from bayt.cue — do not edit
+services:
+  gabi-router-caddy:
+    ports:
+    - ${CADDY_TLS_HOST_PORT:-27798}:8443
+    - ${CADDY_TLS_HOST_PORT:-27798}:8443/udp

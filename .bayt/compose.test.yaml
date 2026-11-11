@@ -1,0 +1,48 @@
+# generated from bayt.cue — do not edit
+services:
+  gabi-router-test:
+    build:
+      additional_contexts:
+        gabi-router-build: service:gabi-router-build
+      context: ..
+      dockerfile: .bayt/Dockerfile.test
+      target: test
+      tags:
+      - bayt-gabi-router-test:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
+      - bayt-gabi-router-test:latest
+      args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/gabi-router}
+        BUILDKIT_SYNTAX: >-
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-gabi-router-test:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
+    scale: 0
+  gabi-router-test_bayt:
+    build:
+      additional_contexts:
+        gabi-router-build_bayt: service:gabi-router-build_bayt
+        gabi-router-generate_bayt: service:gabi-router-generate_bayt
+        gabi-router-setup_bayt: service:gabi-router-setup_bayt
+      context: ..
+      dockerfile: .bayt/Dockerfile.test
+      target: test_bayt
+      args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/gabi-router}
+        BUILDKIT_SYNTAX: >-
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-gabi-router-test_bayt:latest
+    scale: 0
+  gabi-router-test_srcs:
+    build:
+      additional_contexts:
+        gabi-router-build_srcs: service:gabi-router-build_srcs
+        gabi-router-generate_srcs: service:gabi-router-generate_srcs
+        gabi-router-setup_srcs: service:gabi-router-setup_srcs
+      context: ..
+      dockerfile: .bayt/Dockerfile.test
+      target: test_srcs
+      args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/gabi-router}
+        BUILDKIT_SYNTAX: >-
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-gabi-router-test_srcs:latest
+    scale: 0

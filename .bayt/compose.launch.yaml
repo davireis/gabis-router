@@ -1,0 +1,47 @@
+# generated from bayt.cue — do not edit
+services:
+  gabi-router-launch:
+    build:
+      additional_contexts:
+        gabi-router-caddy: service:gabi-router-caddy
+      context: ..
+      dockerfile: .bayt/Dockerfile.launch
+      target: launch
+      tags:
+      - bayt-gabi-router-launch:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
+      - bayt-gabi-router-launch:latest
+      args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/gabi-router}
+        BUILDKIT_SYNTAX: >-
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    depends_on:
+      gabi-router-caddy:
+        condition: service_healthy
+        restart: true
+    healthcheck:
+      test:
+      - CMD
+      - echo
+      - gabi-router is healthy
+      interval: 5s
+      timeout: 2s
+      retries: 3
+    image: bayt-gabi-router-launch:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
+    networks:
+      default:
+        aliases:
+        - launch
+  gabi-router-launch_bayt:
+    build:
+      additional_contexts:
+        gabi-router-build_bayt: service:gabi-router-build_bayt
+        gabi-router-caddy_bayt: service:gabi-router-caddy_bayt
+      context: ..
+      dockerfile: .bayt/Dockerfile.launch
+      target: launch_bayt
+      args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/gabi-router}
+        BUILDKIT_SYNTAX: >-
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-gabi-router-launch_bayt:latest
+    scale: 0
